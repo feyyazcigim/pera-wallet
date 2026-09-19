@@ -1,13 +1,10 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { api, session } from "./api";
 import { AppDataProvider, useApp } from "./store";
 
-const NAV = [
-  { to: "/app", label: "Home", end: true },
-  { to: "/app/rules", label: "Rules" },
-  { to: "/app/analytics", label: "Analytics" },
-];
+const NAV: Record<string, string> = { Home: "/app", Rules: "/app/rules", Analytics: "/app/analytics" };
 
 /** Guard + layout: no wallet yet → the passkey onboarding. */
 export function Shell() {
@@ -26,8 +23,10 @@ export function Shell() {
 
 function Frame() {
   const nav = useNavigate();
+  const { pathname } = useLocation();
   const { me, error } = useApp();
   const demo = session.isDemo();
+  const active = Object.keys(NAV).find((k) => NAV[k] === pathname.replace(/\/$/, "")) ?? "Home";
 
   // an expired session is cleared by the API client on 401 → back to the passkey screen
   useEffect(() => {
@@ -43,31 +42,39 @@ function Frame() {
 
   return (
     <div className="dash">
-      <aside className="dash-side">
-        <a className="logo" href="/">
-          pera
-          <i className="logo-dot" />
-        </a>
-        <nav>
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? "on" : "")}>
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="dash-user">
-          <span className="chip">{demo ? "demo data" : "Stellar testnet"}</span>
-          <b>{me?.displayName ?? "…"}</b>
-          <button type="button" onClick={() => void signOut()}>
-            Sign out
-          </button>
+      {/* the landing page's floating glass pill, with the dashboard's sections in it */}
+      <header className="nav pill app-nav">
+        <div className="nav-inner">
+          <a className="logo" href="/">
+            pera
+            <i className="logo-dot" />
+          </a>
+          <div className="app-tabs">
+            <MagnetTabs slug="app-nav" options={Object.keys(NAV)} activeTab={active} onSelect={(k) => nav(NAV[k])} />
+          </div>
+          <div className="app-user">
+            <span className="eyebrow">
+              <i /> {demo ? "demo data" : "Stellar testnet"}
+            </span>
+            <b>{me?.displayName ?? "…"}</b>
+            <button type="button" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          </div>
         </div>
-      </aside>
+      </header>
       <main className="dash-main">
         {demo && <div className="banner">You're looking at demo data generated in this browser. Nothing here is on-chain — sign out to create a real wallet.</div>}
         {error && !demo && <div className="banner warn">{error}</div>}
         <Outlet />
       </main>
+      <footer className="dash-foot">
+        <div className="wordmark">
+          pera
+          <i />
+        </div>
+        <p>Your lira earns. Your agent spends.</p>
+      </footer>
     </div>
   );
 }

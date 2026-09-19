@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api, type Balances, type Me, type PeraEvent, type Policy, type Position } from "./api";
+import { api, type Balances, type Me, type PeraEvent, type Policy, type Position, type Rules } from "./api";
 
 /** Everything the dashboard pages read. Loaded once, refreshed on every SSE event and on a slow poll. */
 type AppData = {
@@ -9,6 +9,7 @@ type AppData = {
   /** vault value − net deposits, derived from the event log */
   earnedUsdc: number;
   policy: Policy | null;
+  rules: Rules | null;
   events: PeraEvent[];
   loading: boolean;
   error: string | null;
@@ -31,6 +32,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [balances, setBalances] = useState<Balances | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
+  const [rules, setRules] = useState<Rules | null>(null);
   const [events, setEvents] = useState<PeraEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +41,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const b = api();
     // each call settles on its own: a missing vault (no DEFINDEX key) must not blank the whole page
-    const [m, bal, pos, pol, ev] = await Promise.allSettled([b.me(), b.balances(), b.position(), b.policy(), b.events()]);
+    const [m, bal, pos, pol, ev, rul] = await Promise.allSettled([b.me(), b.balances(), b.position(), b.policy(), b.events(), b.rules()]);
     if (m.status === "fulfilled") setMe(m.value);
     if (bal.status === "fulfilled") setBalances(bal.value);
     if (pos.status === "fulfilled") setPosition(pos.value);
     if (pol.status === "fulfilled") setPolicy(pol.value);
+    if (rul.status === "fulfilled") setRules(rul.value);
     if (ev.status === "fulfilled") setEvents([...ev.value].sort((a, z) => z.ts.localeCompare(a.ts)));
     const failed = [m, bal].find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
     setError(failed ? String((failed.reason as Error)?.message ?? failed.reason) : null);
@@ -79,7 +82,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return Math.max(0, position.valueUsdc - Math.max(0, net));
   }, [position, events]);
 
-  const value = useMemo(() => ({ me, balances, position, earnedUsdc, policy, events, loading, error, refresh, onLive }), [me, balances, position, earnedUsdc, policy, events, loading, error, refresh, onLive]);
+  const value = useMemo(() => ({ me, balances, position, earnedUsdc, policy, rules, events, loading, error, refresh, onLive }), [me, balances, position, earnedUsdc, policy, rules, events, loading, error, refresh, onLive]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -96,6 +99,7 @@ export function describe(e: PeraEvent): { kind: EventKind; label: string; sign: 
     case "float.topup": return { kind: "agent", label: "Agent budget topped up", sign: "" };
     case "float.topup.rejected": return { kind: "agent", label: "Top-up rejected by the on-chain cap", sign: "", rejected: true };
     case "x402.402": return { kind: "agent", label: `Paywall quoted a price${where}`, sign: "" };
+    case "x402.rejected": return { kind: "agent", label: `Blocked by your rules${where}`, sign: "", rejected: true };
     case "x402.paid": return { kind: "agent", label: `Agent paid${where}`, sign: "−" };
     case "bridge.burned": return { kind: "bridge", label: "USDC burned on Stellar (CCTP)", sign: "" };
     case "bridge.attested": return { kind: "bridge", label: "Circle attested the burn", sign: "" };

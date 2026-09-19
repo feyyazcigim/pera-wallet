@@ -1,5 +1,5 @@
 import { motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BRAND, DASHBOARD_URL, LOGO_SRC } from "./brand";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
@@ -8,6 +8,7 @@ import { TextStream } from "@/components/block/text-stream";
 import { TextFillAnimation } from "@/components/block/text-fill-animation";
 import { FlowScene, type FlowStep } from "./FlowScene";
 import { HowCards } from "./HowCards";
+import { Hl, Line } from "./ui";
 
 const PRESETS: Record<string, { k: string; v: string }[]> = {
   Cautious: [
@@ -52,20 +53,6 @@ function Logo() {
       {BRAND.replace(/\.$/, "")}
       <i className="logo-dot" />
     </>
-  );
-}
-
-/** Yellow highlighter that wipes in when scrolled into view. */
-function Hl({ children, delay = 0.15 }: { children: ReactNode; delay?: number }) {
-  return (
-    <motion.mark
-      initial={{ backgroundSize: "0% 100%" }}
-      whileInView={{ backgroundSize: "100% 100%" }}
-      viewport={{ once: true, margin: "-120px" }}
-      transition={{ duration: 0.6, delay, ease: [0.2, 0.8, 0.2, 1] }}
-    >
-      {children}
-    </motion.mark>
   );
 }
 
@@ -274,20 +261,5 @@ export default function App() {
         </footer>
       </div>
     </SmoothScroll>
-  );
-}
-
-/** Headline line that slides up out of a mask on load. */
-function Line({ children, delay }: { children: ReactNode; delay: number }) {
-  return (
-    <span className="line">
-      <motion.span
-        initial={{ y: "105%" }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.8, delay, ease: [0.2, 0.8, 0.2, 1] }}
-      >
-        {children}
-      </motion.span>
-    </span>
   );
 }

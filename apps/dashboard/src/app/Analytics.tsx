@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { Hl, Line, Rise } from "../ui";
 import { shortUrl, usd, useApp } from "./store";
 
 /**
@@ -15,7 +16,7 @@ export function Analytics() {
     const paid = events.filter((e) => e.type === "x402.paid");
     const spent = paid.reduce((a, e) => a + (e.amountUsdc ?? 0), 0);
     const deposited = events.filter((e) => e.type === "onramp.completed").reduce((a, e) => a + (e.amountUsdc ?? 0), 0);
-    const rejected = events.filter((e) => e.type === "float.topup.rejected").length;
+    const rejected = events.filter((e) => e.type === "float.topup.rejected" || e.type === "x402.rejected").length;
 
     const days: { key: string; label: string; value: number }[] = [];
     const today = new Date();
@@ -44,19 +45,24 @@ export function Analytics() {
 
   return (
     <>
-      <header className="page-head">
-        <div>
-          <h1>Analytics</h1>
-          <p className="muted">Built from your account's event log — every number traces back to a transaction in History.</p>
-        </div>
-      </header>
+      <section className="dash-hero">
+        <span className="eyebrow">
+          <i /> computed from your event log — nothing here is made up
+        </span>
+        <h1>
+          <Line delay={0.05}>Where the money</Line>
+          <Line delay={0.18}>
+            <Hl delay={0.8}>went</Hl>.
+          </Line>
+        </h1>
+      </section>
 
-      <section className="tiles">
+      <Rise className="tiles">
         <Kpi label="Agent spend, all time" value={usd(stats.spent, 3)} loading={loading} />
         <Kpi label="Payments settled" value={String(stats.paid)} loading={loading} />
         <Kpi label="Average price per call" value={stats.paid ? usd(stats.spent / stats.paid, 4) : "—"} loading={loading} />
-        <Kpi label="Blocked by the cap" value={String(stats.rejected)} loading={loading} hint="over-cap attempts rejected on-chain" />
-      </section>
+        <Kpi label="Blocked by your rules" value={String(stats.rejected)} loading={loading} hint="rejected on-chain or by the router" />
+      </Rise>
 
       <Chart title="Agent spend per day" subtitle={`USDC paid over x402 · last ${DAYS} days`} rows={stats.days.map((d) => ({ label: d.label, value: d.value }))} empty={stats.spent === 0}>
         <Columns data={stats.days} />

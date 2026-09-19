@@ -2,17 +2,23 @@ import { browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowFillButton } from "@/components/block/arrow-fill-button";
+import { MagnetTabs } from "@/components/block/magnet-tabs";
+import { TextStream } from "@/components/block/text-stream";
+import { EASE, Hl, Line } from "../ui";
 import { api, API_URL, session } from "./api";
 
 /** What the API does during the single sign-up request (guide §5.1) — shown while we wait ~30 s. */
 const PROVISION_STEPS = [
-  { label: "Passkey verified", hint: "your device keeps the key — the server never sees it" },
-  { label: "Deploying your smart account", hint: "an OpenZeppelin account on Stellar, owned by your passkey" },
-  { label: "Writing the agent's spending rule", hint: "a daily cap, enforced by the contract" },
-  { label: "Opening treasury and agent accounts", hint: "reserves and fees are sponsored — you never hold XLM" },
-  { label: "Creating your Base wallet", hint: "for paywalls on other chains, via Circle CCTP" },
+  { label: "Passkey verified", hint: "Your device keeps the key — the server never sees it." },
+  { label: "Deploying your smart account", hint: "An OpenZeppelin account on Stellar, owned by your passkey." },
+  { label: "Writing the agent's spending rule", hint: "A daily cap, enforced by the contract itself." },
+  { label: "Opening treasury and agent accounts", hint: "Reserves and fees are sponsored — you never hold XLM." },
+  { label: "Creating your Base wallet", hint: "For paywalls on other chains, through Circle CCTP." },
 ];
-
+const PAYS_FOR = ["LLM calls", "FX rates", "web search", "market data", "translations", "image generation", "cloud compute"];
+const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", fillTextColor: "#0a0a0a", hoverFillBgColor: "#ffd400", hoverFillTextColor: "#0a0a0a" };
+const TABS = { "Create wallet": "create", "I have a passkey": "login" } as const;
 type Mode = "create" | "login";
 
 export function Onboard() {
@@ -24,6 +30,7 @@ export function Onboard() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const supported = browserSupportsWebAuthn();
+  const stepMs = session.isDemo() ? 800 : 6000;
 
   useEffect(() => {
     if (session.exists()) nav("/app", { replace: true });
@@ -32,10 +39,9 @@ export function Onboard() {
   // the provisioning request is one long call; walk the steps on a clock so the wait is legible
   useEffect(() => {
     if (!busy || mode !== "create") return;
-    const per = session.isDemo() ? 800 : 6000;
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, PROVISION_STEPS.length - 1)), per);
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, PROVISION_STEPS.length - 1)), stepMs);
     return () => clearInterval(t);
-  }, [busy, mode]);
+  }, [busy, mode, stepMs]);
 
   async function run(kind: Mode, demo = false) {
     setError(null);
@@ -64,43 +70,52 @@ export function Onboard() {
         </a>
         <div>
           <h1>
-            One passkey.
-            <br />
-            No seed phrase.
+            <Line delay={0.05}>One passkey.</Line>
+            <Line delay={0.18}>
+              No <Hl delay={0.8}>seed phrase</Hl>.
+            </Line>
           </h1>
-          <p>Face ID or Touch ID creates your wallet. After that, lira comes in, earns in a vault, and your agent pays within a cap that lives on-chain.</p>
+          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.45 }}>
+            Face ID or Touch ID creates your wallet. After that, lira comes in, earns in a vault, and your agent pays within limits that you set.
+          </motion.p>
         </div>
-        <small>Stellar testnet · {API_URL.replace(/^https?:\/\//, "")}</small>
+        <div className="onb-stream">
+          <TextStream prefix="Your agent pays for" items={PAYS_FOR} height="150px" fontSize="clamp(1.15rem, 1.7vw, 1.6rem)" fontWeight={700} />
+          <small>Stellar testnet · {API_URL.replace(/^https?:\/\//, "")}</small>
+        </div>
       </aside>
 
       <main className="onb-main">
         <AnimatePresence mode="wait">
           {busy && mode === "create" ? (
-            <motion.div key="prov" className="onb-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <h2>Setting up your wallet</h2>
-              <p className="muted">This happens once and takes about half a minute. Keep this tab open.</p>
-              <ol className="onb-steps">
-                {PROVISION_STEPS.map((s, i) => (
-                  <li key={s.label} className={i < step ? "done" : i === step ? "on" : ""}>
-                    <span>{i < step ? "✓" : i + 1}</span>
-                    <div>
-                      <b>{s.label}</b>
-                      <small>{s.hint}</small>
-                    </div>
-                  </li>
-                ))}
+            <motion.div key="prov" className="onb-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}>
+              <span className="eyebrow">
+                <i /> about half a minute · keep this tab open
+              </span>
+              <h2>
+                Setting up your <mark>wallet</mark>.
+              </h2>
+              <ol className="steps-list onb-steps">
+                {PROVISION_STEPS.map((s, i) => {
+                  const on = i === step;
+                  return (
+                    <li key={s.label} className={on ? "on" : i < step ? "done" : ""}>
+                      <div className="onb-step">
+                        <b>{i < step ? "✓" : `0${i + 1}`}</b>
+                        <span>{s.label}</span>
+                      </div>
+                      <motion.div className="steps-body" initial={false} animate={{ height: on ? "auto" : 0, opacity: on ? 1 : 0 }} transition={{ duration: 0.4, ease: EASE }}>
+                        <p>{s.hint}</p>
+                      </motion.div>
+                      {on && <motion.i key={step} className="steps-progress" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: stepMs / 1000, ease: "linear" }} />}
+                    </li>
+                  );
+                })}
               </ol>
             </motion.div>
           ) : (
-            <motion.div key="form" className="onb-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <div className="seg" role="tablist">
-                <button type="button" role="tab" aria-selected={mode === "create"} className={mode === "create" ? "on" : ""} onClick={() => setMode("create")}>
-                  Create wallet
-                </button>
-                <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "on" : ""} onClick={() => setMode("login")}>
-                  I have a passkey
-                </button>
-              </div>
+            <motion.div key="form" className="onb-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}>
+              <MagnetTabs slug="onb" options={Object.keys(TABS)} activeTab={mode === "create" ? "Create wallet" : "I have a passkey"} onSelect={(k) => setMode(TABS[k as keyof typeof TABS])} />
 
               {mode === "create" ? (
                 <form
@@ -109,7 +124,9 @@ export function Onboard() {
                     void run("create");
                   }}
                 >
-                  <h2>Create your wallet</h2>
+                  <h2>
+                    Create your <mark>wallet</mark>.
+                  </h2>
                   <label>
                     What should we call you?
                     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ayşe" autoComplete="name" autoFocus />
@@ -120,17 +137,19 @@ export function Onboard() {
                     </span>
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
                   </label>
-                  <button className="primary" type="submit" disabled={!supported || busy}>
+                  <ArrowFillButton as="button" type="submit" className="lg" disabled={!supported || busy} {...BTN}>
                     Create with passkey
-                  </button>
+                  </ArrowFillButton>
                 </form>
               ) : (
-                <div>
-                  <h2>Welcome back</h2>
+                <div className="onb-login">
+                  <h2>
+                    Welcome <mark>back</mark>.
+                  </h2>
                   <p className="muted">Your passkey is the owner of your smart account. One prompt and you're in.</p>
-                  <button className="primary" type="button" disabled={!supported || busy} onClick={() => void run("login")}>
+                  <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void run("login")} {...BTN}>
                     {busy ? "Waiting for your passkey…" : "Sign in with passkey"}
-                  </button>
+                  </ArrowFillButton>
                 </div>
               )}
 

@@ -20,7 +20,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   events.setSink((e) => insertEvent({ id: e.id, userId: e.userId ?? null, ts: e.ts, type: e.type, amountUsdc: e.amountUsdc, network: e.network, txHash: e.txHash, explorerUrl: e.explorerUrl, detail: e.detail }));
 
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info", base: undefined }, disableRequestLogging: true, bodyLimit: 256 * 1024 });
-  await app.register(cors, { origin: true, credentials: true, exposedHeaders: ["*"] });
+  await app.register(cors, { origin: true, credentials: true, exposedHeaders: ["*"], methods: ["GET", "HEAD", "POST", "PUT", "OPTIONS"] }); // PUT: /agent/rules (the default list stops at POST)
   registerAuth(app);
   registerErrorHandler(app);
 

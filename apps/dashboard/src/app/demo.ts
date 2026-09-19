@@ -3,7 +3,7 @@
  * so the dashboard can be built and shown before the backend is reachable. The UI labels it
  * "demo data" everywhere; nothing here touches a chain.
  */
-import { CapExceededError, type Backend, type PeraEvent } from "./api";
+import { CapExceededError, RuleViolationError, type Backend, type PeraEvent } from "./api";
 
 const KEY = "pera.demo.state";
 const RATE = 48.79; // USD/TRY, same figure the landing page uses
@@ -19,13 +19,16 @@ type State = {
   deposited: number;
   base: number;
   cap: number;
+  weeklyCap: number | null;
+  maxPerCall: number | null;
+  networks: string[];
   spends: { ts: number; amount: number }[];
   events: PeraEvent[];
   accruedAt: number;
 };
 
 const fresh = (name = "Demo user"): State => ({
-  name, treasury: 0, float: 0, smartAccount: 0, vault: 0, deposited: 0, base: 0, cap: 5, spends: [], events: [], accruedAt: Date.now(),
+  name, treasury: 0, float: 0, smartAccount: 0, vault: 0, deposited: 0, base: 0, cap: 5, weeklyCap: 25, maxPerCall: 0.05, networks: ["stellar:testnet", "eip155:84532"], spends: [], events: [], accruedAt: Date.now(),
 });
 
 let state: State = load();
@@ -56,7 +59,7 @@ function accrue() {
   state.accruedAt = now;
 }
 function emit(type: string, amountUsdc: number | null, detail: Record<string, unknown> = {}, network: string | null = "stellar:testnet") {
-  const tx = ["onramp.started", "x402.402", "float.topup.rejected", "user.registered"].includes(type) ? null : hash();
+  const tx = ["onramp.started", "x402.402", "x402.rejected", "float.topup.rejected", "user.registered"].includes(type) ? null : hash();
   const e: PeraEvent = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     ts: new Date().toISOString(),
@@ -73,6 +76,11 @@ const usedToday = () => {
   state.spends = state.spends.filter((s) => s.ts >= since);
   return state.spends.reduce((a, s) => a + s.amount, 0);
 };
+function paidThisWeek() {
+  const since = Date.now() - 7 * 24 * 3600 * 1000;
+  const paid = state.events.filter((e) => e.type === "x402.paid" && Date.parse(e.ts) >= since);
+  return { spentThisWeekUsdc: paid.reduce((a, e) => a + (e.amountUsdc ?? 0), 0), paymentsThisWeek: paid.length };
+}
 function priceFor(url: string) {
   const u = url.toLowerCase();
   if (u.includes("weather")) return 0.01;
@@ -114,6 +122,7 @@ export const demoBackend: Backend = {
     emit("user.registered", null, {}, null);
     emit("wallet.provisioned", null);
     emit("agent.authorized", state.cap, { rule: 1 });
+    void demoBackend.onramp(3000); // deposits come from the CLI in the real product; the demo seeds one so there is something to look at
     return "demo";
   },
   async login() {
@@ -140,6 +149,17 @@ export const demoBackend: Backend = {
   async policy() {
     const used = usedToday();
     return { capUsdc: state.cap, usedUsdc: used, remainingUsdc: Math.max(0, state.cap - used), windowLedgers: 17280, transfers: state.spends.length, policyUrl: null };
+  },
+  async rules() {
+    return { weeklyCapUsdc: state.weeklyCap, maxPerCallUsdc: state.maxPerCall, allowedNetworks: state.networks, ...paidThisWeek() };
+  },
+  async setRules(input) {
+    await wait(500);
+    state.weeklyCap = input.weeklyCapUsdc;
+    state.maxPerCall = input.maxPerCallUsdc;
+    state.networks = input.allowedNetworks;
+    save();
+    return this.rules();
   },
   async events() {
     return state.events;
@@ -168,26 +188,18 @@ export const demoBackend: Backend = {
       }
     })();
   },
-  async offramp(amountUsdc) {
-    accrue();
-    const available = state.treasury + state.vault;
-    if (amountUsdc > available + 1e-9) throw new Error(`Only $${available.toFixed(2)} is available to withdraw.`);
-    await wait(1800);
-    const fromTreasury = Math.min(state.treasury, amountUsdc);
-    state.treasury -= fromTreasury;
-    const fromVault = amountUsdc - fromTreasury;
-    if (fromVault > 0) {
-      state.vault -= fromVault;
-      state.deposited = Math.max(0, state.deposited - fromVault);
-      emit("yield.withdrawn", fromVault);
-    }
-    emit("offramp.completed", amountUsdc, { amountTry: amountUsdc * RATE * 0.995 });
-  },
   async pay(url, prefer = "auto") {
     const price = priceFor(url);
     const network = prefer === "evm" || url.toLowerCase().includes("/base/") ? "eip155:84532" : "stellar:testnet";
     emit("x402.402", price, { url }, network);
     await wait(700);
+    const refuse = (rule: string, reason: string) => {
+      emit("x402.rejected", price, { url, rule, reason }, network);
+      return new RuleViolationError(409, reason, "RULE_VIOLATION");
+    };
+    if (!state.networks.includes(network)) throw refuse("allowed_chains", `this paywall only accepts ${network}, which your rules do not allow`);
+    if (state.maxPerCall !== null && price > state.maxPerCall) throw refuse("max_per_call", `this call costs ${price} USDC; your max per call is ${state.maxPerCall} USDC`);
+    if (state.weeklyCap !== null && paidThisWeek().spentThisWeekUsdc + price > state.weeklyCap) throw refuse("weekly_limit", `this payment would go over your weekly limit of ${state.weeklyCap} USDC`);
     const timeline = [`402 Payment Required · $${price.toFixed(3)}`];
     if (state.float < price) {
       topUpFloat(Math.max(price, 0.25));

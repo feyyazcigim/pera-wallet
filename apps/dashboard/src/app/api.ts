@@ -31,6 +31,7 @@ type WirePolicy = {
   dailyCapUsdc: string; usedInWindowUsdc: string; remainingUsdc: string; periodLedgers: number; transfersInWindow: number;
   policyContract: string; policyExplorerUrl: string; authorised?: boolean;
 };
+type WireRules = { weeklyCapUsdc: string | null; maxPerCallUsdc: string | null; allowedNetworks: string[]; spentThisWeekUsdc: string; paymentsThisWeek: number };
 type WireEvent = { id: string; ts: string; type: string; amountUsdc?: string | null; network?: string | null; txHash?: string | null; explorerUrl?: string | null; detail?: Record<string, unknown> | null };
 type WirePay = { url: string; paid: boolean; status: number; body: unknown; network?: string; amountUsdc?: string; txHash?: string; explorerUrl?: string; bridged?: { burnTxHash: string; mintTxHash: string }; timeline: WireEvent[] };
 type WireOverCap = { rejected: boolean; attemptedUsdc: string; dailyCapUsdc: string; errorCode: number; errorName: string; explanation: string; policyExplorerUrl: string };
@@ -47,6 +48,13 @@ export type Me = {
 export type Balances = { treasury: number; float: number; smartAccount: number; vault: number; base: number; total: number };
 export type Position = { valueUsdc: number; apy: number | null; vaultId: string | null; explorerUrl: string | null };
 export type Policy = { capUsdc: number; usedUsdc: number; remainingUsdc: number; windowLedgers: number; transfers: number; policyUrl: string | null };
+export const NETWORKS = [
+  { id: "stellar:testnet", label: "Stellar", hint: "native x402" },
+  { id: "eip155:84532", label: "Base", hint: "via Circle CCTP" },
+] as const;
+/** Router-enforced rules (the daily cap is separate: on-chain, in `Policy`). null = no limit. */
+export type Rules = { weeklyCapUsdc: number | null; maxPerCallUsdc: number | null; allowedNetworks: string[]; spentThisWeekUsdc: number; paymentsThisWeek: number };
+export type RulesInput = Pick<Rules, "weeklyCapUsdc" | "maxPerCallUsdc" | "allowedNetworks">;
 export type PeraEvent = { id: string; ts: string; type: string; amountUsdc: number | null; network: string | null; txHash: string | null; explorerUrl: string | null; detail: Record<string, unknown> };
 export type PayResult = { paid: boolean; status: number; body: unknown; network: string | null; amountUsdc: number | null; txHash: string | null; explorerUrl: string | null; timeline: string[] };
 export type PayPrefer = "auto" | "stellar" | "evm";
@@ -62,6 +70,8 @@ export class ApiError extends Error {
 }
 /** 409 SPENDING_CAP_EXCEEDED — the on-chain spending_limit policy said no (#3221). */
 export class CapExceededError extends ApiError {}
+/** 409 RULE_VIOLATION — a router rule (weekly limit, max per call, allowed chains) refused the payment before signing. */
+export class RuleViolationError extends ApiError {}
 
 export interface Backend {
   register(input: { displayName: string; email?: string; dailyCapUsdc?: number }): Promise<string>; // → session token
@@ -72,10 +82,12 @@ export interface Backend {
   /** null when the vault is not configured on the API (no DEFINDEX_API_KEY / VAULT_ID). */
   position(): Promise<Position | null>;
   policy(): Promise<Policy>;
+  rules(): Promise<Rules>;
+  setRules(input: RulesInput): Promise<Rules>;
   events(): Promise<PeraEvent[]>;
   subscribe(onEvent: (e: PeraEvent) => void): () => void;
+  /** Deposits are triggered from the CLI; the dashboard only keeps this for the demo backend's seed deposit. */
   onramp(amountTry: number): Promise<void>;
-  offramp(amountUsdc: number): Promise<void>;
   pay(url: string, prefer?: PayPrefer): Promise<PayResult>;
   overCapDemo(): Promise<string>; // → the chain's rejection, explained
   setCap(capUsdc: number, me: Me): Promise<void>;
@@ -141,6 +153,7 @@ async function http<T>(path: string, init: { method?: string; body?: unknown; au
     const msg = err.error ?? `${res.status} ${res.statusText}`;
     if (res.status === 401) session.setToken(null); // expired session → the guard sends the user back to onboarding
     if (err.code === "SPENDING_CAP_EXCEEDED") throw new CapExceededError(res.status, msg, err.code);
+    if (err.code === "RULE_VIOLATION") throw new RuleViolationError(res.status, msg, err.code);
     throw new ApiError(res.status, msg, err.code ?? null);
   }
   return data as T;
@@ -167,7 +180,14 @@ function normMe(m: WireMe): Me {
     credentialId: s?.credentialId ?? null, passkeyPublicKey: s?.passkeyPublicKey ?? null,
   };
 }
-const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "x402.402", "x402.paid", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
+const normRules = (r: WireRules): Rules => ({
+  weeklyCapUsdc: r.weeklyCapUsdc === null ? null : usdc(r.weeklyCapUsdc),
+  maxPerCallUsdc: r.maxPerCallUsdc === null ? null : usdc(r.maxPerCallUsdc),
+  allowedNetworks: r.allowedNetworks,
+  spentThisWeekUsdc: usdc(r.spentThisWeekUsdc),
+  paymentsThisWeek: r.paymentsThisWeek,
+});
+const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "x402.402", "x402.paid", "x402.rejected", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
 const timelineLabel = (e: WireEvent) => `${e.type}${e.amountUsdc ? ` · ${e.amountUsdc} USDC` : ""}${e.network?.startsWith("eip155") ? " · Base" : ""}`;
 
 /* ── the real backend ─────────────────────────────────────────────────── */
@@ -215,6 +235,15 @@ const httpBackend: Backend = {
     const p = await http<WirePolicy>("/agent/policy");
     return { capUsdc: usdc(p.dailyCapUsdc), usedUsdc: usdc(p.usedInWindowUsdc), remainingUsdc: usdc(p.remainingUsdc), windowLedgers: p.periodLedgers, transfers: p.transfersInWindow, policyUrl: p.policyExplorerUrl };
   },
+  rules: async () => normRules(await http<WireRules>("/agent/rules")),
+  async setRules(input) {
+    const body = {
+      weeklyCapUsdc: input.weeklyCapUsdc === null ? null : dec(input.weeklyCapUsdc, 7),
+      maxPerCallUsdc: input.maxPerCallUsdc === null ? null : dec(input.maxPerCallUsdc, 7),
+      allowedNetworks: input.allowedNetworks,
+    };
+    return normRules(await http<WireRules>("/agent/rules", { method: "PUT", body }));
+  },
   events: async () => (await http<WireEvent[]>("/events?limit=500")).map(normEvent),
   subscribe(onEvent) {
     const token = session.token();
@@ -233,7 +262,6 @@ const httpBackend: Backend = {
     return () => es.close();
   },
   onramp: async (amountTry) => void (await http("/onramp", { body: { amountTry: dec(amountTry, 2) } })),
-  offramp: async (amountUsdc) => void (await http("/offramp", { body: { amountUsdc: dec(amountUsdc, 7) } })),
   async pay(url, prefer = "auto") {
     const r = await http<WirePay>("/agent/pay", { body: { url, prefer } });
     const timeline = r.timeline.map(timelineLabel);

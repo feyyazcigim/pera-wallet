@@ -1,102 +1,14 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { ArrowFillButton } from "@/components/block/arrow-fill-button";
+import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { FlowScene, type FlowSceneHandle, type FlowStep } from "../FlowScene";
-import { api, CapExceededError, RESOURCE_SERVER_URL, type PayPrefer, type PayResult, type PeraEvent } from "./api";
+import { CountUp, Hl, Line, Rise } from "../ui";
+import { api, CapExceededError, NETWORKS, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
 import { describe, pendingOf, shortUrl, timeAgo, usd, useApp, type EventKind } from "./store";
 
-const FILTERS: { key: "all" | EventKind; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "deposit", label: "Deposits" },
-  { key: "yield", label: "Vault" },
-  { key: "agent", label: "Agent" },
-  { key: "bridge", label: "Bridge" },
-  { key: "withdraw", label: "Withdrawals" },
-];
-
-export function Home() {
-  const { me, balances, position, earnedUsdc, policy, events, loading } = useApp();
-  const [modal, setModal] = useState<null | "add" | "withdraw">(null);
-  const pending = useMemo(() => pendingOf(events), [events]);
-  const hour = new Date().getHours();
-  const hello = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-
-  return (
-    <>
-      <header className="page-head">
-        <div>
-          <h1>
-            {hello}, {me?.displayName ?? "…"}
-          </h1>
-          <p className="muted">Your money is earning, and your agent is on a leash.</p>
-        </div>
-        <div className="actions">
-          <button className="btn-line" type="button" onClick={() => setModal("withdraw")}>
-            Withdraw
-          </button>
-          <button className="btn-solid" type="button" onClick={() => setModal("add")}>
-            Add lira
-          </button>
-        </div>
-      </header>
-
-      <section className="tiles">
-        <Tile label="Total balance" value={balances ? usd(balances.total) : "—"} loading={loading} big>
-          {balances && (
-            <small>
-              vault {usd(balances.vault)} · liquid {usd(balances.treasury + balances.smartAccount)} · agent {usd(balances.float + balances.base)}
-            </small>
-          )}
-        </Tile>
-        <Tile label="Yield earned" value={position ? `+${usd(earnedUsdc, 6)}` : "—"} loading={loading} mark={Boolean(position)}>
-          <small>{position ? `${usd(position.valueUsdc)} in the vault${position.apy !== null ? ` · ${(position.apy * (position.apy > 1 ? 1 : 100)).toFixed(2)}% APY` : ""}` : "vault not configured on the API"}</small>
-        </Tile>
-        <Tile label="Agent budget drawn today" value={policy ? usd(policy.usedUsdc, 3) : "—"} loading={loading}>
-          {policy && (
-            <>
-              <div className="meter" role="img" aria-label={`${usd(policy.usedUsdc, 2)} of ${usd(policy.capUsdc)} used`}>
-                <i style={{ width: `${Math.min(100, (policy.usedUsdc / Math.max(policy.capUsdc, 0.0001)) * 100)}%` }} />
-              </div>
-              <small>
-                {usd(policy.remainingUsdc)} left of a {usd(policy.capUsdc)} daily cap
-              </small>
-            </>
-          )}
-        </Tile>
-        <Tile label="Pending" value={String(pending.length)} loading={loading}>
-          <small>{pending.length ? "in flight right now" : "nothing in flight"}</small>
-        </Tile>
-      </section>
-
-      <LiveFlow />
-
-      <section className="cols">
-        <Panel title="Pending transactions">
-          {pending.length === 0 ? (
-            <p className="empty">Nothing in flight. Deposits and bridge transfers show up here while they settle.</p>
-          ) : (
-            <ul className="pending">
-              {pending.map((e) => (
-                <li key={e.id}>
-                  <span className="spinner" />
-                  <div>
-                    <b>{e.type === "onramp.started" ? `Lira deposit${tryOf(e) ? ` · ₺${tryOf(e)!.toLocaleString("en-US")}` : ""}` : "Bridge to Base"}</b>
-                    <small>{e.type === "onramp.started" ? "waiting for the anchor to pay out USDC" : "waiting for Circle's attestation"}</small>
-                  </div>
-                  <time>{timeAgo(e.ts)}</time>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-        <AgentConsole />
-      </section>
-
-      <History events={events} />
-
-      <AnimatePresence>{modal && <MoneyModal kind={modal} onClose={() => setModal(null)} />}</AnimatePresence>
-    </>
-  );
-}
+const FILTERS: Record<string, "all" | EventKind> = { All: "all", Deposits: "deposit", Vault: "yield", Agent: "agent", Bridge: "bridge" };
+const BTN = { bgColor: "#ffd400", textColor: "#0a0a0a", fillBgColor: "#0a0a0a", fillTextColor: "#ffd400", hoverFillBgColor: "#0a0a0a", hoverFillTextColor: "#ffd400" };
 
 /** `detail.amountTry` is a decimal string on the wire. */
 const tryOf = (e: PeraEvent): number | null => {
@@ -104,24 +16,71 @@ const tryOf = (e: PeraEvent): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-function Tile(p: { label: string; value: string; loading: boolean; big?: boolean; mark?: boolean; children?: ReactNode }) {
+export function Home() {
+  const { me, balances, position, earnedUsdc, policy, events, loading } = useApp();
+  const pending = useMemo(() => pendingOf(events), [events]);
+  const hour = new Date().getHours();
+  const hello = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const first = me?.displayName.split(" ")[0] ?? "";
+  const idle = !loading && (balances?.total ?? 0) === 0;
+
   return (
-    <div className={`tile${p.big ? " big" : ""}`}>
-      <span className="tile-label">{p.label}</span>
-      <strong className={p.loading ? "skeleton" : ""}>{p.mark && !p.loading ? <mark>{p.value}</mark> : p.value}</strong>
-      {p.children}
-    </div>
-  );
-}
-function Panel({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
-  return (
-    <section className="panel">
-      <header>
-        <h2>{title}</h2>
-        {aside}
-      </header>
-      {children}
-    </section>
+    <>
+      <section className="dash-hero">
+        <span className="eyebrow">
+          <i /> {pending.length ? `${pending.length} in flight right now` : "everything settled"}
+        </span>
+        <h1>
+          <Line delay={0.05}>
+            {hello}
+            {first && `, ${first}`}.
+          </Line>
+          <Line delay={0.18}>
+            Your lira is <Hl delay={0.8}>{idle ? "on its way" : "earning"}</Hl>.
+          </Line>
+        </h1>
+
+        <Rise className="hero-figure" delay={0.35}>
+          <div className="hero-total">
+            <small>Total balance</small>
+            <strong className={loading ? "skeleton" : ""}>{balances ? <CountUp value={balances.total} format={(n) => usd(n)} /> : "—"}</strong>
+          </div>
+          <dl className="hero-facts">
+            <div>
+              <dt>Working in the vault</dt>
+              <dd>{position ? <CountUp value={position.valueUsdc} format={(n) => usd(n)} /> : balances ? usd(balances.vault) : "—"}</dd>
+              <small>{position ? (position.apy !== null ? `${(position.apy > 1 ? position.apy : position.apy * 100).toFixed(2)}% APY` : "DeFindex vault") : "vault not configured on the API"}</small>
+            </div>
+            <div>
+              <dt>Yield earned</dt>
+              <dd>
+                <mark>
+                  +<CountUp value={earnedUsdc} format={(n) => usd(n, 6)} />
+                </mark>
+              </dd>
+              <small>vault value − what you put in</small>
+            </div>
+            <div>
+              <dt>Agent budget left today</dt>
+              <dd>{policy ? <CountUp value={policy.remainingUsdc} format={(n) => usd(n)} /> : "—"}</dd>
+              <div className="meter" role="img" aria-label={policy ? `${usd(policy.usedUsdc)} of ${usd(policy.capUsdc)} used` : "loading"}>
+                <i style={{ width: `${policy ? Math.min(100, (policy.usedUsdc / Math.max(policy.capUsdc, 0.0001)) * 100) : 0}%` }} />
+              </div>
+            </div>
+          </dl>
+        </Rise>
+        {idle && <p className="hero-hint mono">$ pera onramp 3000 &nbsp;— deposits are made from the CLI; they show up here the moment they start.</p>}
+      </section>
+
+      <LiveFlow />
+
+      <Rise className="dash-cols">
+        <AgentConsole />
+        <Budget pending={pending} />
+      </Rise>
+
+      <History events={events} />
+    </>
   );
 }
 
@@ -149,7 +108,7 @@ function LiveFlow() {
       if (n && !names.includes(n)) names.push(n);
       if (names.length === 3) break;
     }
-    return names.length ? [...names, "paywall", "paywall"].slice(0, 3) : ["weather", "paywall", "paywall"];
+    return [...names, "/stellar/weather", "/base/summary", "/any/quote"].filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
   }, [paid]);
   const servicesRef = useRef(services);
   servicesRef.current = services;
@@ -189,17 +148,17 @@ function LiveFlow() {
   const lastDeposit = events.find((e) => e.type === "onramp.completed");
   const tryAmt = lastDeposit ? tryOf(lastDeposit) : null;
   return (
-    <section className="panel flow-panel">
-      <header>
-        <h2>Live flow</h2>
-        <span className="chip live">
-          <i /> updates as it happens
-        </span>
-      </header>
+    <Rise className="stage dash-stage">
+      <div className="stage-bar">
+        <span />
+        <span />
+        <span />
+        <em>live · this moves when your money does</em>
+      </div>
       <FlowScene
         ref={ref}
         step={step}
-        command="pera onramp"
+        command="pera onramp 3000"
         live={{
           quote: lastDeposit && tryAmt ? `₺${tryAmt.toLocaleString("en-US")} → ${usd(lastDeposit.amountUsdc ?? 0)}` : "TRY → USDC",
           quoteSub: lastDeposit && tryAmt && lastDeposit.amountUsdc ? `quote locked @ ${(tryAmt / lastDeposit.amountUsdc).toFixed(2)}` : "quote locked by the anchor",
@@ -211,140 +170,180 @@ function LiveFlow() {
           services,
         }}
       />
-    </section>
+    </Rise>
   );
 }
 
 // the three demo paywalls of apps/resource-server
-const PRESETS: { label: string; url: string; prefer: PayPrefer }[] = [
-  { label: "weather · Stellar", url: `${RESOURCE_SERVER_URL}/api/stellar/weather`, prefer: "auto" },
-  { label: "summary · Base via CCTP", url: `${RESOURCE_SERVER_URL}/api/base/summary`, prefer: "evm" },
-  { label: "quote · either network", url: `${RESOURCE_SERVER_URL}/api/any/quote`, prefer: "auto" },
-];
+const PRESETS: Record<string, { url: string; prefer: PayPrefer }> = {
+  "weather · Stellar": { url: `${RESOURCE_SERVER_URL}/api/stellar/weather`, prefer: "auto" },
+  "summary · Base": { url: `${RESOURCE_SERVER_URL}/api/base/summary`, prefer: "evm" },
+  "quote · either": { url: `${RESOURCE_SERVER_URL}/api/any/quote`, prefer: "auto" },
+};
 
+/** A terminal, like the one on the landing page — except this one really sends the agent out. */
 function AgentConsole() {
   const { refresh } = useApp();
-  const [url, setUrl] = useState(PRESETS[0].url);
+  const [preset, setPreset] = useState(Object.keys(PRESETS)[0]);
+  const [url, setUrl] = useState(PRESETS[preset].url);
   const [prefer, setPrefer] = useState<PayPrefer>("auto");
   const [busy, setBusy] = useState<null | "pay" | "cap">(null);
   const [result, setResult] = useState<PayResult | null>(null);
-  const [error, setError] = useState<{ text: string; cap: boolean } | null>(null);
+  const [error, setError] = useState<{ text: string; kind: "cap" | "rule" | "err" } | null>(null);
 
-  async function pay(e: FormEvent) {
+  async function run(fn: () => Promise<void>, which: "pay" | "cap") {
+    setBusy(which);
+    setError(null);
+    setResult(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError({ text: err instanceof Error ? err.message : String(err), kind: err instanceof CapExceededError ? "cap" : err instanceof RuleViolationError ? "rule" : "err" });
+    } finally {
+      setBusy(null);
+      void refresh();
+    }
+  }
+  const pay = (e: FormEvent) => {
     e.preventDefault();
-    setBusy("pay");
-    setError(null);
-    setResult(null);
-    try {
-      setResult(await api().pay(url.trim(), prefer));
-    } catch (err) {
-      setError({ text: err instanceof Error ? err.message : String(err), cap: err instanceof CapExceededError });
-    } finally {
-      setBusy(null);
-      void refresh();
-    }
-  }
-  async function overCap() {
-    setBusy("cap");
-    setError(null);
-    setResult(null);
-    try {
-      setError({ text: await api().overCapDemo(), cap: true });
-    } catch (err) {
-      setError({ text: err instanceof Error ? err.message : String(err), cap: false });
-    } finally {
-      setBusy(null);
-      void refresh();
-    }
-  }
+    void run(async () => setResult(await api().pay(url.trim(), prefer)), "pay");
+  };
+  const overCap = () => void run(async () => setError({ text: await api().overCapDemo(), kind: "cap" }), "cap");
 
   return (
-    <Panel title="Agent console" aside={<span className="muted small">send your agent to a paywall</span>}>
-      <form className="console" onSubmit={pay}>
-        <input
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setPrefer("auto");
+    <section className="term">
+      <header>
+        <span>agent console</span>
+        <em>x402</em>
+      </header>
+      <div className="term-tabs">
+        <MagnetTabs
+          slug="paywall"
+          options={Object.keys(PRESETS)}
+          activeTab={preset}
+          onSelect={(k) => {
+            setPreset(k);
+            setUrl(PRESETS[k].url);
+            setPrefer(PRESETS[k].prefer);
           }}
-          placeholder="https://…"
-          spellCheck={false}
-          aria-label="Paywalled URL"
         />
-        <button className="btn-solid" type="submit" disabled={busy !== null || !url.trim()}>
-          {busy === "pay" ? "Paying…" : "Pay"}
-        </button>
-      </form>
-      <div className="chips">
-        {PRESETS.map((p) => (
-          <button
-            key={p.url}
-            type="button"
-            className={`chip${url === p.url ? " on" : ""}`}
-            onClick={() => {
-              setUrl(p.url);
-              setPrefer(p.prefer);
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
-        <button type="button" className="chip" disabled={busy !== null} onClick={() => void overCap()}>
-          {busy === "cap" ? "asking the chain…" : "try to overspend →"}
-        </button>
       </div>
-      {result && (
-        <div className="console-out ok">
-          <ol>
+      <form onSubmit={pay}>
+        <label className="term-line mono">
+          <span>$ pera pay</span>
+          <input
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setPrefer("auto");
+            }}
+            spellCheck={false}
+            aria-label="Paywalled URL"
+          />
+        </label>
+        <div className="term-actions">
+          <ArrowFillButton as="button" type="submit" disabled={busy !== null || !url.trim()} {...BTN}>
+            {busy === "pay" ? "Paying…" : "Send the agent"}
+          </ArrowFillButton>
+          <button type="button" className="term-link" disabled={busy !== null} onClick={overCap}>
+            {busy === "cap" ? "asking the chain…" : "try to overspend →"}
+          </button>
+        </div>
+      </form>
+      <div className="term-out mono" aria-live="polite">
+        {!result && !error && <p className="dim">{busy ? "› working…" : "› the agent's receipt shows up here"}</p>}
+        {result && (
+          <>
             {result.timeline.map((t, i) => (
-              <li key={i}>{t}</li>
+              <p key={i} className="dim">
+                › {t}
+              </p>
             ))}
-          </ol>
-          <p className="console-meta mono">
-            {result.paid ? "paid" : `not paid · HTTP ${result.status}`}
-            {result.amountUsdc !== null && ` · ${usd(result.amountUsdc, 3)}`}
-            {result.network && ` · ${result.network.startsWith("eip155") ? "Base Sepolia" : "Stellar"}`}
-            {result.explorerUrl && (
-              <>
-                {" · "}
-                <a href={result.explorerUrl} target="_blank" rel="noreferrer">
-                  transaction ↗
-                </a>
-              </>
-            )}
-          </p>
-          <pre>{typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2)}</pre>
-        </div>
-      )}
-      {error && (
-        <div className={`console-out ${error.cap ? "cap" : "err"}`}>
-          {error.cap && <b>The contract said no.</b>}
-          <p>{error.text}</p>
-        </div>
-      )}
-    </Panel>
+            <p>
+              <mark>{result.paid ? "paid" : `HTTP ${result.status}`}</mark>
+              {result.amountUsdc !== null && ` ${usd(result.amountUsdc, 3)}`}
+              {result.network && ` on ${result.network.startsWith("eip155") ? "Base Sepolia" : "Stellar"}`}
+              {result.explorerUrl && (
+                <>
+                  {" · "}
+                  <a href={result.explorerUrl} target="_blank" rel="noreferrer">
+                    transaction ↗
+                  </a>
+                </>
+              )}
+            </p>
+            <pre>{typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2)}</pre>
+          </>
+        )}
+        {error && (
+          <>
+            <p>
+              <mark>{error.kind === "cap" ? "the contract said no" : error.kind === "rule" ? "blocked by your rules" : "error"}</mark>
+            </p>
+            <p>{error.text}</p>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Budget({ pending }: { pending: PeraEvent[] }) {
+  const { policy, rules } = useApp();
+  const chains = rules ? NETWORKS.filter((n) => rules.allowedNetworks.includes(n.id)).map((n) => n.label).join(" + ") : "—";
+  return (
+    <section className="rulecard dash-budget">
+      <header>
+        <span>ruleset</span>
+        <em>live</em>
+      </header>
+      <div className="row">
+        <span>Daily limit</span>
+        <b>{policy ? `${usd(policy.usedUsdc)} / ${usd(policy.capUsdc)}` : "—"}</b>
+      </div>
+      <div className="row">
+        <span>Weekly limit</span>
+        <b>{rules ? `${usd(rules.spentThisWeekUsdc)} / ${rules.weeklyCapUsdc === null ? "no limit" : usd(rules.weeklyCapUsdc)}` : "—"}</b>
+      </div>
+      <div className="row">
+        <span>Max per call</span>
+        <b>{rules ? (rules.maxPerCallUsdc === null ? "no limit" : usd(rules.maxPerCallUsdc, 3)) : "—"}</b>
+      </div>
+      <div className="row">
+        <span>Allowed chains</span>
+        <b>{chains}</b>
+      </div>
+      <div className="row">
+        <span>In flight</span>
+        <b>
+          {pending.length === 0
+            ? "nothing"
+            : pending.map((e) => (e.type === "onramp.started" ? `₺${tryOf(e)?.toLocaleString("en-US") ?? "…"} deposit` : "bridge to Base")).join(" · ")}
+          {pending.length > 0 && <i className="spinner" />}
+        </b>
+      </div>
+      <Link className="row link" to="/app/rules">
+        <span>Change the rules</span>
+        <b>→</b>
+      </Link>
+    </section>
   );
 }
 
 function History({ events }: { events: PeraEvent[] }) {
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
-  const [limit, setLimit] = useState(12);
-  const rows = useMemo(() => events.map((e) => ({ e, d: describe(e) })).filter((r) => r.e.type !== "x402.402" && (filter === "all" || r.d.kind === filter)), [events, filter]);
+  const [filter, setFilter] = useState("All");
+  const [limit, setLimit] = useState(10);
+  const rows = useMemo(() => events.map((e) => ({ e, d: describe(e) })).filter((r) => r.e.type !== "x402.402" && (FILTERS[filter] === "all" || r.d.kind === FILTERS[filter])), [events, filter]);
   return (
-    <Panel
-      title="History"
-      aside={
-        <div className="chips">
-          {FILTERS.map((f) => (
-            <button key={f.key} type="button" className={`chip${filter === f.key ? " on" : ""}`} onClick={() => setFilter(f.key)}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-      }
-    >
+    <Rise className="dash-section">
+      <div className="section-head">
+        <h2>
+          Every move, with a <Hl>receipt</Hl>.
+        </h2>
+        <MagnetTabs slug="history" options={Object.keys(FILTERS)} activeTab={filter} onSelect={setFilter} />
+      </div>
       {rows.length === 0 ? (
-        <p className="empty">No activity yet. Add lira to get things moving.</p>
+        <p className="empty">Nothing here yet. Deposits, vault moves and agent payments land here with their transaction.</p>
       ) : (
         <table className="history">
           <thead>
@@ -389,60 +388,6 @@ function History({ events }: { events: PeraEvent[] }) {
           Show more ({rows.length - limit})
         </button>
       )}
-    </Panel>
-  );
-}
-
-function MoneyModal({ kind, onClose }: { kind: "add" | "withdraw"; onClose: () => void }) {
-  const { balances, refresh } = useApp();
-  const [amount, setAmount] = useState(kind === "add" ? "3000" : "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const n = Number.parseFloat(amount);
-  const available = balances ? balances.treasury + balances.vault : 0;
-  const valid = kind === "add" ? n >= 50 && n <= 3000 : n > 0 && n <= available + 1e-9;
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      if (kind === "add") await api().onramp(n);
-      else await api().offramp(n);
-      void refresh();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <motion.div className="modal-back" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-      <motion.form className="modal" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2>{kind === "add" ? "Add lira" : "Withdraw to your bank"}</h2>
-        <p className="muted">
-          {kind === "add"
-            ? "A bank transfer through the anchor. On testnet the bank is simulated: the lira \"arrives\" as soon as you confirm, then it becomes USDC and moves into the vault."
-            : `USDC leaves the vault, goes back through the anchor and lands in your bank as lira. Available: ${usd(available)}.`}
-        </p>
-        <label>
-          {kind === "add" ? "Amount in TRY (50 – 3,000)" : "Amount in USDC"}
-          <div className="amount">
-            <span>{kind === "add" ? "₺" : "$"}</span>
-            <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} autoFocus />
-          </div>
-        </label>
-        {error && <p className="onb-error">{error}</p>}
-        <div className="modal-actions">
-          <button type="button" className="btn-line" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="btn-solid" disabled={!valid || busy}>
-            {busy ? "Working…" : kind === "add" ? "Send lira" : "Withdraw"}
-          </button>
-        </div>
-      </motion.form>
-    </motion.div>
+    </Rise>
   );
 }
