@@ -120,6 +120,9 @@ export const session = {
   isDemo: () => ls.get(DEMO_KEY) === "1",
   setDemo: (on: boolean) => ls.set(DEMO_KEY, on ? "1" : null),
   exists: () => Boolean(ls.get(TOKEN_KEY)) || ls.get(DEMO_KEY) === "1",
+  /** This browser has registered or signed in before — browsers never reveal whether a passkey exists, so this hint decides what "Continue" does. */
+  knowsPasskey: () => Boolean(ls.get(CREDENTIAL_KEY)),
+  forgetPasskey: () => ls.set(CREDENTIAL_KEY, null),
 };
 
 /* ── helpers ──────────────────────────────────────────────────────────── */

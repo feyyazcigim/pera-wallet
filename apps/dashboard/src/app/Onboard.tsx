@@ -3,10 +3,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
-import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { TextStream } from "@/components/block/text-stream";
 import { EASE, Hl, Line } from "../ui";
-import { api, API_URL, session } from "./api";
+import { api, ApiError, API_URL, session } from "./api";
 
 /** What the API does during the single sign-up request (guide §5.1) — shown while we wait ~30 s. */
 const PROVISION_STEPS = [
@@ -18,12 +17,12 @@ const PROVISION_STEPS = [
 ];
 const PAYS_FOR = ["LLM calls", "FX rates", "web search", "market data", "translations", "image generation", "cloud compute"];
 const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", fillTextColor: "#0a0a0a", hoverFillBgColor: "#ffd400", hoverFillTextColor: "#0a0a0a" };
-const TABS = { "Create wallet": "create", "I have a passkey": "login" } as const;
 type Mode = "create" | "login";
 
 export function Onboard() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<Mode>("create");
+  // one button: a browser that has been here before signs in, a new one creates a wallet
+  const [mode, setMode] = useState<Mode>(() => (session.knowsPasskey() ? "login" : "create"));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,7 +55,12 @@ export function Onboard() {
     } catch (e) {
       session.setDemo(false);
       const msg = e instanceof Error ? e.message : String(e);
-      setError(/NotAllowedError|timed out|not allowed/i.test(msg) ? "The passkey prompt was dismissed. Try again when you're ready." : msg);
+      if (kind === "login" && e instanceof ApiError && (e.code === "UNKNOWN_CREDENTIAL" || e.code === "UNKNOWN_USER")) {
+        // the hint was stale (different server, wiped database) → fall back to creating a wallet
+        session.forgetPasskey();
+        setMode("create");
+        setError("This server doesn't know that passkey. Create a wallet to continue.");
+      } else setError(/NotAllowedError|timed out|not allowed/i.test(msg) ? "The passkey prompt was dismissed. Try again when you're ready." : msg);
       setBusy(false);
     }
   }
@@ -115,8 +119,6 @@ export function Onboard() {
             </motion.div>
           ) : (
             <motion.div key="form" className="onb-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}>
-              <MagnetTabs slug="onb" options={Object.keys(TABS)} activeTab={mode === "create" ? "Create wallet" : "I have a passkey"} onSelect={(k) => setMode(TABS[k as keyof typeof TABS])} />
-
               {mode === "create" ? (
                 <form
                   onSubmit={(e) => {
@@ -138,7 +140,7 @@ export function Onboard() {
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
                   </label>
                   <ArrowFillButton as="button" type="submit" className="lg" disabled={!supported || busy} {...BTN}>
-                    Create with passkey
+                    Continue
                   </ArrowFillButton>
                 </form>
               ) : (
@@ -146,9 +148,9 @@ export function Onboard() {
                   <h2>
                     Welcome <mark>back</mark>.
                   </h2>
-                  <p className="muted">Your passkey is the owner of your smart account. One prompt and you're in.</p>
+                  <p className="muted">This browser has a wallet. Your passkey owns it — one prompt and you're in.</p>
                   <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void run("login")} {...BTN}>
-                    {busy ? "Waiting for your passkey…" : "Sign in with passkey"}
+                    {busy ? "Waiting for your passkey…" : "Continue"}
                   </ArrowFillButton>
                 </div>
               )}
@@ -157,6 +159,12 @@ export function Onboard() {
               {error && <p className="onb-error">{error}</p>}
 
               <p className="onb-demo">
+                {mode === "create" ? "Already have a wallet? " : "New here? "}
+                <button type="button" disabled={busy} onClick={() => { setError(null); setMode(mode === "create" ? "login" : "create"); }}>
+                  {mode === "create" ? "Continue with your passkey" : "Create a wallet"}
+                </button>
+              </p>
+              <p className="onb-demo quiet">
                 No backend running?{" "}
                 <button type="button" onClick={() => void run("create", true)}>
                   Look around with demo data

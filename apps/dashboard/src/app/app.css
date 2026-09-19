@@ -890,7 +890,7 @@ button:disabled {
   gap: 22px;
   padding: 28px 28px 30px;
   border: 1px solid var(--line);
-  border-radius: 0 22px 22px 22px;
+  border-radius: 22px;
 }
 .onb-card label {
   display: flex;
@@ -987,4 +987,11 @@ button:disabled {
 .onb-stream .obsidian-text-stream p {
   max-width: none;
   color: var(--paper);
+}
+.onb-demo.quiet {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.onb-demo.quiet button {
+  color: var(--muted);
 }
