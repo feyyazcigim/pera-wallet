@@ -12,7 +12,8 @@
     "smoke:yield": "tsx yield-smoke.ts",
     "smoke:pay": "tsx pay-smoke.ts",
     "demo": "tsx demo.ts",
-    "gen:openapi": "tsx gen-openapi.ts"
+    "gen:openapi": "tsx gen-openapi.ts",
+    "bridge:resume": "tsx bridge-resume.ts"
   },
   "dependencies": {
     "@pera/anchor": "workspace:*",
