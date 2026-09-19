@@ -1,0 +1,43 @@
+@keyframes obsidian-text-fill-color {
+  0% { color: var(--tfa-dim-color); }
+  30% { color: var(--tfa-primary-color); }
+  100% { color: var(--tfa-text-color); }
+}
+
+.obsidian-text-fill .split__wrapper .split-chars {
+  transition: color 0.4s;
+  color: var(--tfa-dim-color);
+}
+
+.obsidian-text-fill .split__wrapper .split-chars.show {
+  animation: obsidian-text-fill-color 0.5s;
+  color: var(--tfa-text-color);
+}
+
+.obsidian-text-fill .tfa-viewport { height: var(--tfa-viewport-height); }
+.obsidian-text-fill .tfa-text-wrapper { width: var(--tfa-text-width); }
+.obsidian-text-fill .tfa-heading { font-size: var(--tfa-text-size); color: var(--tfa-text-color); }
+.obsidian-text-fill .tfa-glow {
+  height: calc(var(--tfa-viewport-height) * 0.7);
+  width: calc(var(--tfa-viewport-height) * 0.7);
+  background: color-mix(in srgb, var(--tfa-primary-color) 5%, transparent);
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .obsidian-text-fill .tfa-text-wrapper { width: var(--tfa-tablet-text-width); }
+  .obsidian-text-fill .tfa-heading { font-size: var(--tfa-tablet-text-size); }
+}
+
+@media (max-width: 767px) {
+  .obsidian-text-fill .tfa-text-wrapper { width: var(--tfa-mobile-text-width); }
+  .obsidian-text-fill .tfa-heading { font-size: var(--tfa-mobile-text-size); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obsidian-text-fill { height: auto !important; }
+  .obsidian-text-fill .split__wrapper .split-chars {
+    animation: none;
+    transition: none;
+    color: var(--tfa-text-color);
+  }
+}

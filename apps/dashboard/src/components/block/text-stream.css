@@ -1,0 +1,21 @@
+.obsidian-text-stream { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .obsidian-text-stream .obsidian-text-stream__viewport {
+    display: flex;
+    align-items: center;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
+
+  .obsidian-text-stream .obsidian-text-stream__track {
+    position: relative !important;
+    transform: none !important;
+  }
+
+  .obsidian-text-stream__copy + .obsidian-text-stream__copy { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obsidian-text-stream__blur { display: none; }
+}
