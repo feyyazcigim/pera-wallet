@@ -7,9 +7,13 @@ import { demoBackend } from "./demo";
 
 // Deploy convention: dashboard on <domain>, API on api.<domain> — so VITE_API_URL is optional in production.
 const isLocal = typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-export const API_URL: string =
-  import.meta.env.VITE_API_URL ?? (isLocal ? "http://localhost:3000" : `https://api.${window.location.hostname}`);
-export const RESOURCE_SERVER_URL: string = import.meta.env.VITE_RESOURCE_SERVER_URL ?? "http://localhost:4000";
+// `||` not `??`: an empty VITE_API_URL (Docker ARG not passed) must fall through to the default, otherwise every
+// request goes to the dashboard's own origin and nginx answers 405 for POST.
+const trimSlash = (u: string) => u.replace(/\/+$/, "");
+export const API_URL: string = trimSlash(
+  import.meta.env.VITE_API_URL || (isLocal ? "http://localhost:3000" : `https://api.${window.location.hostname}`),
+);
+export const RESOURCE_SERVER_URL: string = trimSlash(import.meta.env.VITE_RESOURCE_SERVER_URL || "http://localhost:4000");
 
 /* ── wire types (what the API returns) ────────────────────────────────── */
 type WireMe = {
