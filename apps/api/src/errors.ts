@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { ContractInvokeError, childLogger } from "@pera/core";
 import { SmartAccountOpError, SpendingCapExceededError } from "@pera/smart-account";
-import { PaywallError } from "@pera/x402-router";
+import { PaywallError, RuleViolationError } from "@pera/x402-router";
 
 const log = childLogger("api.errors");
 
@@ -12,6 +12,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (err instanceof SpendingCapExceededError) {
       return reply.status(409).send({ error: err.message, code: "SPENDING_CAP_EXCEEDED", errorCode: err.code, detail: { attemptedUsdc: err.attemptedUsdc, dailyCapUsdc: err.dailyCapUsdc, errorName: err.errorName, raw: err.raw } });
     }
+    if (err instanceof RuleViolationError) return reply.status(409).send({ error: err.message, code: "RULE_VIOLATION", detail: { rule: err.rule, ...err.detail } });
     if (err instanceof SmartAccountOpError) return reply.status(502).send({ error: err.message, code: "SMART_ACCOUNT_ERROR", errorCode: err.decoded.code ?? undefined, detail: err.decoded });
     if (err instanceof ContractInvokeError) return reply.status(502).send({ error: err.message, code: "CONTRACT_ERROR", errorCode: err.code ?? undefined, detail: { phase: err.phase, raw: err.raw } });
     if (err instanceof PaywallError) return reply.status(502).send({ error: err.message, code: "PAYWALL_ERROR", detail: { status: err.status, body: err.body } });

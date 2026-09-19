@@ -177,6 +177,30 @@ components:
       required:
         - dailyCapUsdc
       additionalProperties: false
+    RulesBody:
+      type: object
+      properties:
+        weeklyCapUsdc:
+          nullable: true
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+        maxPerCallUsdc:
+          nullable: true
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+        allowedNetworks:
+          minItems: 1
+          type: array
+          items:
+            type: string
+            enum:
+              - stellar:testnet
+              - eip155:84532
+      required:
+        - weeklyCapUsdc
+        - maxPerCallUsdc
+        - allowedNetworks
+      additionalProperties: false
     PayBody:
       type: object
       properties:
@@ -510,6 +534,40 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /agent/rules:
+    get:
+      summary: Router-enforced agent rules (weekly x402 limit, max price per call,
+        allowed chains) + this week's spend
+      security: *a2
+      responses:
+        "200":
+          description: "{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks,
+            spentThisWeekUsdc, paymentsThisWeek, enforcedBy }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      summary: Replace the agent rules; violations make POST /agent/pay answer 409
+        RULE_VIOLATION before anything is signed
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RulesBody"
+      responses:
+        "200":
+          description: "{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks,
+            spentThisWeekUsdc, paymentsThisWeek, enforcedBy }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400": *a1
   /agent/policy/build:
     post:
       summary: Build set_spending_limit for passkey signing

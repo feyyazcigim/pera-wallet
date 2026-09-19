@@ -36,6 +36,10 @@ const paths = {
     get: { summary: "Cap, used, remaining, rule id — read from the spending_limit policy contract", security: bearer, responses: { 200: obj("PolicyView") } },
     post: { summary: "Submit the passkey-signed cap change (built by /agent/policy/build)", security: bearer, requestBody: { required: true, content: json("XdrBody") }, responses: { 200: obj("{ ruleId, txHash, dailyCapUsdc }") } },
   },
+  "/agent/rules": {
+    get: { summary: "Router-enforced agent rules (weekly x402 limit, max price per call, allowed chains) + this week's spend", security: bearer, responses: { 200: obj("{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks, spentThisWeekUsdc, paymentsThisWeek, enforcedBy }") } },
+    put: { summary: "Replace the agent rules; violations make POST /agent/pay answer 409 RULE_VIOLATION before anything is signed", security: bearer, requestBody: { required: true, content: json("RulesBody") }, responses: { 200: obj("{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks, spentThisWeekUsdc, paymentsThisWeek, enforcedBy }"), 400: err } },
+  },
   "/agent/policy/build": { post: { summary: "Build set_spending_limit for passkey signing (kit.wallet.fromJSON.execute → kit.signAdmin)", security: bearer, requestBody: { required: true, content: json("PolicyBody") }, responses: { 200: obj("{ json, xdr, ruleId, dailyCapUsdc }") } } },
   "/agent/authorize/build": { post: { summary: "Build add_context_rule (agent signer + spending_limit) for passkey signing", security: bearer, requestBody: { content: json("AuthorizeBuildBody") }, responses: { 200: obj("{ json, xdr, agentPublicKey, dailyCapUsdc, ruleName, smartAccountId }") } } },
   "/agent/authorize": { post: { summary: "Submit the passkey-signed rule transaction sponsored; records the rule id", security: bearer, requestBody: { required: true, content: json("XdrBody") }, responses: { 200: obj("{ ruleId, txHash, explorerUrl }") } } },

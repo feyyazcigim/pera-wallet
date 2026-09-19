@@ -70,6 +70,13 @@ const STATEMENTS = [
   `create index if not exists evm_wallets_address on evm_wallets (lower(address))`,
   `create index if not exists events_user_ts on events (user_id, ts desc)`,
   `create index if not exists sessions_user on sessions (user_id)`,
+  `create table if not exists agent_rules (
+     user_id text primary key references users(id),
+     weekly_cap_usdc text,
+     max_per_call_usdc text,
+     allowed_networks text not null default 'stellar:testnet,eip155:84532',
+     updated_at timestamptz not null default now()
+   )`,
 ];
 
 let done: Promise<void> | undefined;

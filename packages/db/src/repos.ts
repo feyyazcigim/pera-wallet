@@ -268,3 +268,45 @@ export async function countUsers(): Promise<number> {
   const rows = await db.query<{ n: string | number }>("select count(*)::int as n from users");
   return Number(rows[0]?.n ?? 0);
 }
+
+// ---- agent rules (router-enforced; the daily cap lives on-chain in the spending_limit policy) ----
+
+export interface AgentRules {
+  /** Max USDC the agent may pay over x402 in a rolling 7 days; null = no weekly limit. */
+  weeklyCapUsdc: string | null;
+  /** Max price of a single paywall call; null = no per-call limit. */
+  maxPerCallUsdc: string | null;
+  /** CAIP-2 networks the agent may pay on. */
+  allowedNetworks: string[];
+}
+
+export const DEFAULT_AGENT_RULES: AgentRules = { weeklyCapUsdc: null, maxPerCallUsdc: null, allowedNetworks: ["stellar:testnet", "eip155:84532"] };
+
+export async function getAgentRules(userId: string): Promise<AgentRules> {
+  const db = await getDb();
+  const rows = await db.query("select * from agent_rules where user_id = $1", [userId]);
+  const r = rows[0];
+  if (!r) return { ...DEFAULT_AGENT_RULES, allowedNetworks: [...DEFAULT_AGENT_RULES.allowedNetworks] };
+  return {
+    weeklyCapUsdc: (r.weekly_cap_usdc as string | null) ?? null,
+    maxPerCallUsdc: (r.max_per_call_usdc as string | null) ?? null,
+    allowedNetworks: String(r.allowed_networks ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+  };
+}
+
+export async function upsertAgentRules(userId: string, rules: AgentRules): Promise<AgentRules> {
+  const db = await getDb();
+  await db.query(
+    `insert into agent_rules (user_id, weekly_cap_usdc, max_per_call_usdc, allowed_networks, updated_at) values ($1, $2, $3, $4, now())
+     on conflict (user_id) do update set weekly_cap_usdc = excluded.weekly_cap_usdc, max_per_call_usdc = excluded.max_per_call_usdc, allowed_networks = excluded.allowed_networks, updated_at = now()`,
+    [userId, rules.weeklyCapUsdc, rules.maxPerCallUsdc, rules.allowedNetworks.join(",")],
+  );
+  return getAgentRules(userId);
+}
+
+/** Amounts of the user's settled x402 payments since `sinceIso` (decimal USDC strings). */
+export async function listPaidAmountsSince(userId: string, sinceIso: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.query("select amount_usdc from events where user_id = $1 and type = 'x402.paid' and ts >= $2 and amount_usdc is not null", [userId, new Date(sinceIso)]);
+  return rows.map((r) => String(r.amount_usdc));
+}

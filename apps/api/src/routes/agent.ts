@@ -1,13 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { events, stellarTxUrl } from "@pera/core";
-import { updateStellarWallet } from "@pera/db";
+import { getAgentRules, listPaidAmountsSince, updateStellarWallet, upsertAgentRules } from "@pera/db";
 import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, getPolicyUsage, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME } from "@pera/smart-account";
 import { transferUsdcFrom } from "@pera/evm";
-import { ensureSmartAccountBalance, payFor } from "@pera/x402-router";
-import { addUsdc } from "@pera/core";
+import { ensureSmartAccountBalance, payFor, RuleViolationError } from "@pera/x402-router";
+import { addUsdc, cmpUsdc } from "@pera/core";
 import { requireUser } from "../auth";
 import { loadContext } from "../context";
-import { AuthorizeBuildBody, EvmTransferBody, PayBody, PolicyBody, XdrBody } from "../schemas";
+import { AuthorizeBuildBody, EvmTransferBody, PayBody, PolicyBody, RulesBody, XdrBody } from "../schemas";
 
 /** Collects the events emitted for this user during `fn` (returned as `timeline`). */
 async function withTimeline<T>(userId: string, fn: () => Promise<T>): Promise<T & { timeline: unknown[] }> {
@@ -20,6 +20,8 @@ async function withTimeline<T>(userId: string, fn: () => Promise<T>): Promise<T 
     unsub();
   }
 }
+
+const WEEK_MS = 7 * 24 * 3600_000;
 
 export async function agentRoutes(app: FastifyInstance): Promise<void> {
   app.get("/agent/policy", async (req) => {
@@ -76,10 +78,49 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     return submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
   });
 
+  /**
+   * Router-enforced rules next to the on-chain daily cap: weekly x402 limit, max price per call, allowed chains.
+   * Checked in `payFor` after the 402 is parsed and before anything is signed (see /agent/pay).
+   */
+  const rulesView = async (userId: string) => {
+    const rules = await getAgentRules(userId);
+    const paid = await listPaidAmountsSince(userId, new Date(Date.now() - WEEK_MS).toISOString());
+    return { ...rules, spentThisWeekUsdc: paid.reduce((a, x) => addUsdc(a, x), "0"), paymentsThisWeek: paid.length, enforcedBy: "router" as const };
+  };
+  app.get("/agent/rules", async (req) => rulesView(requireUser(req).id));
+  app.put("/agent/rules", async (req) => {
+    const user = requireUser(req);
+    await upsertAgentRules(user.id, RulesBody.parse(req.body));
+    return rulesView(user.id);
+  });
+
   app.post("/agent/pay", async (req) => {
     const ctx = await loadContext(requireUser(req).id);
     const { url, prefer } = PayBody.parse(req.body);
-    return withTimeline(ctx.userId, () => payFor(ctx, url, { prefer }));
+    const rules = await rulesView(ctx.userId);
+    const reject = (err: RuleViolationError, amountUsdc?: string, network?: "stellar:testnet" | "eip155:84532") => {
+      events.emit({ type: "x402.rejected", userId: ctx.userId, amountUsdc, network, detail: { url, rule: err.rule, reason: err.message } });
+      return err;
+    };
+    return withTimeline(ctx.userId, async () => {
+      try {
+        return await payFor(ctx, url, {
+          prefer,
+          allowedNetworks: rules.allowedNetworks,
+          beforePay: (offer) => {
+            if (rules.maxPerCallUsdc && cmpUsdc(offer.amountUsdc, rules.maxPerCallUsdc) > 0) {
+              throw reject(new RuleViolationError(`this call costs ${offer.amountUsdc} USDC; your max per call is ${rules.maxPerCallUsdc} USDC`, "max_per_call", { priceUsdc: offer.amountUsdc, maxPerCallUsdc: rules.maxPerCallUsdc }), offer.amountUsdc, offer.network);
+            }
+            if (rules.weeklyCapUsdc && cmpUsdc(addUsdc(rules.spentThisWeekUsdc, offer.amountUsdc), rules.weeklyCapUsdc) > 0) {
+              throw reject(new RuleViolationError(`this payment would take the week to ${addUsdc(rules.spentThisWeekUsdc, offer.amountUsdc)} USDC; your weekly limit is ${rules.weeklyCapUsdc} USDC`, "weekly_limit", { spentThisWeekUsdc: rules.spentThisWeekUsdc, priceUsdc: offer.amountUsdc, weeklyCapUsdc: rules.weeklyCapUsdc }), offer.amountUsdc, offer.network);
+            }
+          },
+        });
+      } catch (err) {
+        if (err instanceof RuleViolationError && err.rule === "allowed_chains") reject(err);
+        throw err;
+      }
+    });
   });
 
   /**

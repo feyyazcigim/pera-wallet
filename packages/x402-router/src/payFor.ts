@@ -9,6 +9,18 @@ import { narrowTo, offersFrom, pickOffer, type Offer, type Preference } from "./
 
 const log = childLogger("router.pay");
 
+/** A user-set agent rule (allowed chains, max per call, weekly limit) refused this payment before anything was signed. */
+export class RuleViolationError extends Error {
+  constructor(
+    message: string,
+    readonly rule: "allowed_chains" | "max_per_call" | "weekly_limit",
+    readonly detail: Record<string, unknown> = {},
+  ) {
+    super(message);
+    this.name = "RuleViolationError";
+  }
+}
+
 export class PaywallError extends Error {
   constructor(
     message: string,
@@ -52,7 +64,11 @@ async function readBody(res: Response): Promise<unknown> {
  * retries with a signed payment. Stellar offers are paid from the user's agent float (fees sponsored by
  * the facilitator); EVM offers are paid from the user's EVM wallet after a CCTP bridge when short.
  */
-export async function payFor(ctx: PayCtx, url: string, o: { prefer?: Preference; bridgeMinUsdc?: string; init?: RequestInit } = {}): Promise<PayResult> {
+export async function payFor(
+  ctx: PayCtx,
+  url: string,
+  o: { prefer?: Preference; bridgeMinUsdc?: string; init?: RequestInit; allowedNetworks?: string[]; beforePay?: (offer: Offer) => Promise<void> | void } = {},
+): Promise<PayResult> {
   const probe = await fetch(url, o.init);
   if (probe.status !== 402) {
     const body = await readBody(probe);
@@ -64,7 +80,15 @@ export async function payFor(ctx: PayCtx, url: string, o: { prefer?: Preference;
   const paymentRequired = decoder.getPaymentRequiredResponse((n) => probe.headers.get(n), probeBody);
   let offers = offersFrom(paymentRequired);
   if (!ctx.evmWallet) offers = offers.filter((x) => x.network !== BASE_SEPOLIA_CAIP2);
+  if (o.allowedNetworks) {
+    const offered = offers.map((x) => x.network);
+    offers = offers.filter((x) => o.allowedNetworks!.includes(x.network));
+    if (offers.length === 0 && offered.length > 0) {
+      throw new RuleViolationError(`this paywall only accepts ${offered.join(", ")}, which your rules do not allow`, "allowed_chains", { url, offered, allowed: o.allowedNetworks });
+    }
+  }
   const offer = pickOffer(offers, o.prefer ?? "auto");
+  await o.beforePay?.(offer);
   events.emit({ type: "x402.402", userId: ctx.userId, amountUsdc: offer.amountUsdc, network: offer.network, detail: { url, payTo: offer.payTo, offers: offers.map((x) => ({ network: x.network, amountUsdc: x.amountUsdc })) } });
   log.info({ userId: ctx.userId, url, network: offer.network, amountUsdc: offer.amountUsdc }, "402 received");
 

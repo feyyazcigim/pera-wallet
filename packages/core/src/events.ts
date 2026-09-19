@@ -18,6 +18,7 @@ export type EventType =
   | "float.topup.rejected"
   | "x402.402"
   | "x402.paid"
+  | "x402.rejected"
   | "bridge.burned"
   | "bridge.attested"
   | "bridge.minted"
