@@ -1,0 +1,17 @@
+{
+  "name": "@pera/smart-account",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@pera/core": "workspace:*", "@stellar/stellar-sdk": "16.3.0", "smart-account-kit": "0.8.0", "smart-account-kit-bindings": "0.4.0" },
+  "devDependencies": { "typescript": "5.9.3" }
+}

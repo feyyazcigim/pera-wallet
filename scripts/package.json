@@ -1,0 +1,32 @@
+{
+  "name": "@pera/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "keys": "tsx keys.ts",
+    "bootstrap": "tsx bootstrap.ts",
+    "smoke:onramp": "tsx onramp-smoke.ts",
+    "smoke:policy": "tsx policy-smoke.ts",
+    "smoke:yield": "tsx yield-smoke.ts",
+    "smoke:pay": "tsx pay-smoke.ts",
+    "demo": "tsx demo.ts",
+    "gen:openapi": "tsx gen-openapi.ts"
+  },
+  "dependencies": {
+    "@pera/anchor": "workspace:*",
+    "@pera/cctp": "workspace:*",
+    "@pera/core": "workspace:*",
+    "@pera/smart-account": "workspace:*",
+    "@pera/x402-router": "workspace:*",
+    "@pera/yield": "workspace:*",
+    "@stellar/stellar-sdk": "16.3.0",
+    "viem": "2.56.8",
+    "yaml": "^2.8.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

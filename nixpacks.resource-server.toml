@@ -1,0 +1,15 @@
+# Dokploy Application "resource-server": Build Path "/", env NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml
+providers = ["node"]
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = ["corepack enable", "corepack prepare pnpm@10.28.2 --activate", "pnpm install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["pnpm -r run typecheck"]
+
+[start]
+cmd = "pnpm --filter @pera/resource-server start"

@@ -1,0 +1,34 @@
+{
+  "name": "pera-wallet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pera Agent Wallet - AI agent wallet on Stellar testnet (TRY anchor, DeFindex yield, OpenZeppelin smart account spending cap, x402 + CCTP payments)",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "dev:api": "pnpm --filter @pera/api dev",
+    "dev:rs": "pnpm --filter @pera/resource-server dev",
+    "start:api": "pnpm --filter @pera/api start",
+    "start:rs": "pnpm --filter @pera/resource-server start",
+    "agent": "pnpm --filter @pera/agent start --",
+    "keys": "pnpm --filter @pera/scripts keys",
+    "bootstrap": "pnpm --filter @pera/scripts bootstrap",
+    "smoke:onramp": "pnpm --filter @pera/scripts smoke:onramp",
+    "smoke:policy": "pnpm --filter @pera/scripts smoke:policy",
+    "smoke:yield": "pnpm --filter @pera/scripts smoke:yield",
+    "smoke:pay": "pnpm --filter @pera/scripts smoke:pay",
+    "demo": "pnpm --filter @pera/scripts demo",
+    "gen:openapi": "pnpm --filter @pera/scripts gen:openapi"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
+  }
+}

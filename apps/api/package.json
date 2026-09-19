@@ -1,0 +1,19 @@
+{
+  "name": "@pera/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": { "@fastify/cors": "11.3.0", "@pera/anchor": "workspace:*", "@pera/cctp": "workspace:*", "@pera/core": "workspace:*", "@pera/smart-account": "workspace:*", "@pera/x402-router": "workspace:*", "@pera/yield": "workspace:*", "fastify": "5.12.5", "tsx": "4.23.13", "zod": "4.6.5" },
+  "devDependencies": { "typescript": "5.9.3" }
+}
