@@ -86,7 +86,7 @@ export function buildMcpServer(principal: McpPrincipal): McpServer {
           onchainDailyCap: policy ? { dailyCapUsdc: policy.dailyCapUsdc, usedInWindowUsdc: policy.usedInWindowUsdc, remainingUsdc: policy.remainingUsdc, window: policy.windowLabel, authorised: policy.authorised, policyContract: policy.policyContract } : null,
           rules,
           token: me ? { name: me.name, scopes: me.scopes, expiresAt: me.expiresAt } : { scopes: principal.scopes },
-          resourceServer: env.RESOURCE_SERVER_URL,
+          resourceServer: env.RESOURCE_SERVER_URL ?? null,
         });
       } catch (err) {
         return toolError(err);

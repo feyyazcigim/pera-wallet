@@ -31,7 +31,7 @@ export async function statusRoutes(app: FastifyInstance): Promise<void> {
       smartAccount: { accountWasmHash: SMART_ACCOUNT.accountWasmHash, webauthnVerifier: SMART_ACCOUNT.webauthnVerifier, ed25519Verifier: SMART_ACCOUNT.ed25519Verifier, spendingLimitPolicy: SMART_ACCOUNT.spendingLimitPolicy, policyExplorerUrl: stellarContractUrl(SMART_ACCOUNT.spendingLimitPolicy), defaultDailyCapUsdc: env.AGENT_DAILY_CAP_USDC },
       vault: env.VAULT_ID ? { id: env.VAULT_ID, explorerUrl: stellarContractUrl(env.VAULT_ID), configured: isConfigured(), info: vault } : { id: null, configured: isConfigured() },
       evm: { provider: "privy", configured: isPrivyConfigured(), privyAppId: env.PRIVY_APP_ID ?? null, gasSponsorship: env.PRIVY_GAS_SPONSORSHIP, network: "eip155:84532", usdc: BASE_SEPOLIA.usdc, messageTransmitterV2: BASE_SEPOLIA.messageTransmitterV2, cctpDomain: CCTP.baseSepoliaDomain },
-      x402: { facilitator: env.X402_FACILITATOR_URL, resourceServerUrl: env.RESOURCE_SERVER_URL },
+      x402: { facilitator: env.X402_FACILITATOR_URL, resourceServerUrl: env.RESOURCE_SERVER_URL ?? null },
       mcp: { url: `${env.PUBLIC_API_URL.replace(/\/$/, "")}/mcp`, transport: "streamable-http", auth: "Bearer pat_… (POST /agent/tokens)" },
       autopilot: env.AUTOPILOT,
       startedAt,

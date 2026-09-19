@@ -138,8 +138,9 @@ export async function executePayment(userId: string, p: PayRequest): Promise<Pay
 }
 
 /** Paywalled endpoints the demo resource server advertises (`GET /` discovery document). */
-export async function listServices(): Promise<{ resourceServer: string; endpoints: Array<{ url: string; route: string; description?: string; accepts: unknown }> }> {
+export async function listServices(): Promise<{ resourceServer: string | null; endpoints: Array<{ url: string; route: string; description?: string; accepts: unknown }>; note?: string }> {
   const env = loadEnv();
+  if (!env.RESOURCE_SERVER_URL) return { resourceServer: null, endpoints: [], note: "no demo resource server configured; quote_payment / pay_url work with any x402 URL" };
   const base = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
   const res = await fetch(`${base}/`, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw Object.assign(new Error(`resource server discovery failed (${res.status})`), { statusCode: 502, code: "DISCOVERY_FAILED" });

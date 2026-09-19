@@ -47,7 +47,8 @@ export const EnvSchema = z.object({
   PRIVY_APP_SECRET: opt(z.string().min(1)),
   PRIVY_GAS_SPONSORSHIP: z.enum(["on", "off"]).default("on"),
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
-  RESOURCE_SERVER_URL: z.string().url().default("http://localhost:4000"),
+  /** Demo paywall server; optional in production (agents pay third-party x402 endpoints). */
+  RESOURCE_SERVER_URL: opt(z.string().url()),
   EVENTS_FILE: z.string().default("./data/events.jsonl"),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.string().default("info"),

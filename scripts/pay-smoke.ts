@@ -12,6 +12,7 @@ import { appendDeployment } from "./lib/deployments";
 import { say } from "./lib/steps";
 
 const env = loadEnv();
+if (!env.RESOURCE_SERVER_URL) throw new Error("RESOURCE_SERVER_URL is required for this script (start the demo resource server: pnpm dev:rs)");
 const rs = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
 const stellarOnly = process.argv.includes("--stellar-only");
 const { agentPub } = derivedKeys(env);

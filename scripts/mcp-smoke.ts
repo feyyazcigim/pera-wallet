@@ -15,6 +15,7 @@ import { say } from "./lib/steps";
 
 const env = loadEnv();
 const api = env.PUBLIC_API_URL.replace(/\/$/, "");
+if (!env.RESOURCE_SERVER_URL) throw new Error("RESOURCE_SERVER_URL is required for this script (start the demo resource server: pnpm dev:rs)");
 const rs = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
 const sessionFile = path.join(process.env.PERA_HOME ?? path.join(os.homedir(), ".pera"), "session.json");
 if (!existsSync(sessionFile)) throw new Error(`no device session at ${sessionFile}; run \`pnpm agent register\` or \`pnpm agent login\` first`);
