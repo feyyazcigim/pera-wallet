@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
-import { Hl, Line, Rise } from "../ui";
+import { Rise } from "../ui";
 import { api, NETWORKS, session } from "./api";
 import { usd, useApp } from "./store";
 
@@ -73,18 +73,10 @@ export function Rules() {
 
   return (
     <>
-      <section className="dash-hero rules-hero">
-        <span className="eyebrow">
-          <i /> two layers: the chain and the router
-        </span>
-        <h1>
-          <Line delay={0.05}>An agent with a wallet</Line>
-          <Line delay={0.18}>
-            needs a <Hl delay={0.8}>leash</Hl>.
-          </Line>
-        </h1>
-        <p className="lede">The daily limit lives in a contract on Stellar — no server can lift it. The weekly limit, the price per call and the allowed chains are checked by pera's router before the agent signs anything.</p>
-      </section>
+      <header className="page-title">
+        <h1>Rules</h1>
+        <p>The daily limit is enforced by the contract on Stellar; the rest by pera's router, before the agent signs anything.</p>
+      </header>
 
       <Rise className="rules-grid">
         <form className="rules-editor" onSubmit={save}>
@@ -142,11 +134,7 @@ export function Rules() {
       </Rise>
 
       <Rise className="dash-section">
-        <div className="section-head">
-          <h2>
-            Four accounts. <Hl>One</Hl> owner.
-          </h2>
-        </div>
+        <h2 className="section-title">Your accounts</h2>
         <dl className="accounts">
           <Account label="Smart account" hint="owned by your passkey · holds the agent's budget" value={me?.smartAccountId} href={me?.smartAccountUrl} />
           <Account label="Treasury" hint="receives USDC from the anchor · deposits into the vault" value={me?.treasuryPublicKey} href={me?.treasuryUrl} />

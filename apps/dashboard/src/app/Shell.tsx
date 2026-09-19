@@ -68,13 +68,6 @@ function Frame() {
         {error && !demo && <div className="banner warn">{error}</div>}
         <Outlet />
       </main>
-      <footer className="dash-foot">
-        <div className="wordmark">
-          pera
-          <i />
-        </div>
-        <p>Your lira earns. Your agent spends.</p>
-      </footer>
     </div>
   );
 }

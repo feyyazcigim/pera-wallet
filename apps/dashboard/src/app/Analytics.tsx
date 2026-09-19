@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Hl, Line, Rise } from "../ui";
+import { Rise } from "../ui";
 import { shortUrl, usd, useApp } from "./store";
 
 /**
@@ -45,17 +45,10 @@ export function Analytics() {
 
   return (
     <>
-      <section className="dash-hero">
-        <span className="eyebrow">
-          <i /> computed from your event log — nothing here is made up
-        </span>
-        <h1>
-          <Line delay={0.05}>Where the money</Line>
-          <Line delay={0.18}>
-            <Hl delay={0.8}>went</Hl>.
-          </Line>
-        </h1>
-      </section>
+      <header className="page-title">
+        <h1>Analytics</h1>
+        <p>Computed from your account's event log — every number traces back to a transaction in History.</p>
+      </header>
 
       <Rise className="tiles">
         <Kpi label="Agent spend, all time" value={usd(stats.spent, 3)} loading={loading} />
