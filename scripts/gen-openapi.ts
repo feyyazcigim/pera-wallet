@@ -36,6 +36,7 @@ const paths = {
     get: { summary: "Cap, used, remaining, rule id — read from the spending_limit policy contract", security: bearer, responses: { 200: obj("PolicyView") } },
     post: { summary: "Submit the passkey-signed cap change (built by /agent/policy/build)", security: bearer, requestBody: { required: true, content: json("XdrBody") }, responses: { 200: obj("{ ruleId, txHash, dailyCapUsdc }") } },
   },
+  "/cli/token": { post: { summary: "Mint a separate session for the CLI (pnpm agent connect <token>); the passkey cannot be used from a terminal", security: bearer, responses: { 200: obj("{ token, expiresAt, connect }") } } },
   "/agent/rules": {
     get: { summary: "Router-enforced agent rules (weekly x402 limit, max price per call, allowed chains) + this week's spend", security: bearer, responses: { 200: obj("{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks, spentThisWeekUsdc, paymentsThisWeek, enforcedBy }") } },
     put: { summary: "Replace the agent rules; violations make POST /agent/pay answer 409 RULE_VIOLATION before anything is signed", security: bearer, requestBody: { required: true, content: json("RulesBody") }, responses: { 200: obj("{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks, spentThisWeekUsdc, paymentsThisWeek, enforcedBy }"), 400: err } },

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getBalances, getContractUsdcBalance, stellarAccountUrl, stellarContractUrl, baseAddressUrl } from "@pera/core";
-import { getEvmWallet, getPasskey, getStellarWallet, type User } from "@pera/db";
+import { createSession, getEvmWallet, getPasskey, getStellarWallet, type User } from "@pera/db";
 import { getBaseUsdcBalance } from "@pera/evm";
 import { getPosition, isConfigured } from "@pera/yield";
 import { requireUser } from "../auth";
@@ -37,6 +37,16 @@ export async function meView(user: User) {
 
 export async function meRoutes(app: FastifyInstance): Promise<void> {
   app.get("/me", async (req) => meView(requireUser(req)));
+
+  /**
+   * A second session for the same user, meant for the CLI (`pnpm agent connect <token>`): a terminal cannot do
+   * the passkey ceremony, and sharing the browser's own session would die with the browser's sign-out.
+   */
+  app.post("/cli/token", async (req) => {
+    const user = requireUser(req);
+    const session = await createSession(user.id);
+    return { token: session.token, expiresAt: session.expiresAt, connect: `pnpm agent connect ${session.token}` };
+  });
 
   app.get("/balances", async (req) => {
     const user = requireUser(req);

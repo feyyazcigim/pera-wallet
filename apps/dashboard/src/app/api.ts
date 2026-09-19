@@ -91,6 +91,8 @@ export interface Backend {
   pay(url: string, prefer?: PayPrefer): Promise<PayResult>;
   overCapDemo(): Promise<string>; // → the chain's rejection, explained
   setCap(capUsdc: number, me: Me): Promise<void>;
+  /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
+  cliToken(): Promise<string>;
 }
 
 /* ── session ──────────────────────────────────────────────────────────── */
@@ -193,6 +195,8 @@ const normRules = (r: WireRules): Rules => ({
 const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "x402.402", "x402.paid", "x402.rejected", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
 const timelineLabel = (e: WireEvent) => `${e.type}${e.amountUsdc ? ` · ${e.amountUsdc} USDC` : ""}${e.network?.startsWith("eip155") ? " · Base" : ""}`;
 
+let yieldRetryAt = 0;
+
 /* ── the real backend ─────────────────────────────────────────────────── */
 const httpBackend: Backend = {
   // guide §5.1 — one passkey ceremony; POST /auth/register runs ~25–35 s while the wallet is provisioned
@@ -226,11 +230,16 @@ const httpBackend: Backend = {
     return { ...v, total: v.treasury + v.float + v.smartAccount + v.vault + v.base };
   },
   async position() {
+    // no vault on this API (no DEFINDEX_API_KEY / VAULT_ID): don't ask again on every poll — it answers 503 and logs an error each time
+    if (Date.now() < yieldRetryAt) return null;
     try {
       const p = await http<WirePosition>("/yield/position");
       return { valueUsdc: usdc(p.underlyingUsdc), apy: p.apy, vaultId: p.vaultId, explorerUrl: p.explorerUrl };
     } catch (e) {
-      if (e instanceof ApiError && e.code === "YIELD_UNAVAILABLE") return null;
+      if (e instanceof ApiError && e.code === "YIELD_UNAVAILABLE") {
+        yieldRetryAt = Date.now() + 5 * 60_000;
+        return null;
+      }
       throw e;
     }
   },
@@ -275,6 +284,7 @@ const httpBackend: Backend = {
     const r = await http<WireOverCap>("/agent/pay/over-cap-demo", { body: {} });
     return `Error(Contract, #${r.errorCode}) ${r.errorName} — ${r.explanation}`;
   },
+  cliToken: async () => (await http<{ token: string }>("/cli/token", { body: {} })).token,
   // guide §5.7 — build → passkey signs in the browser (kit.signAdmin) → API submits it sponsored
   async setCap(capUsdc, me) {
     if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up — try again in a moment.");

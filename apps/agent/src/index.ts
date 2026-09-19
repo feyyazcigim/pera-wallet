@@ -5,6 +5,7 @@
  *
  *   pnpm agent register --name "Ayşe"     # passkey + smart account (sponsored) + treasury/agent/EVM wallets
  *   pnpm agent login                       # passkey assertion → session
+ *   pnpm agent connect <token>             # use a dashboard account: token from the dashboard's "Connect the CLI"
  *   pnpm agent authorize [--cap 10]        # owner approves the agent rule with the passkey (sponsored submit)
  *   pnpm agent onramp 200                  # TRY → USDC into the treasury
  *   pnpm agent run --task "istanbul weather and a summary"
@@ -86,6 +87,21 @@ program
       saveSession({ token: r.token, expiresAt: r.expiresAt, userId: r.user.id });
       console.log(`✔ registered user ${r.user.id}`);
       console.log(JSON.stringify(r.wallets, null, 2));
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+program
+  .command("connect")
+  .argument("<token>", "CLI token from the dashboard (Home → Connect the CLI)")
+  .description("act for a dashboard (browser-passkey) account: stores the CLI session minted by POST /cli/token")
+  .action(async (token: string) => {
+    try {
+      const me = await api({ token }).get<{ user: { id: string; displayName: string }; wallets: { stellar: { status: string } | null } }>("/me");
+      saveSession({ token, expiresAt: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(), userId: me.user.id });
+      console.log(`✔ connected as ${me.user.displayName} (wallet ${me.wallets.stellar?.status ?? "not provisioned"})`);
+      console.log("  next: pnpm agent onramp 3000");
     } catch (err) {
       fail(err);
     }

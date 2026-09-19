@@ -66,7 +66,7 @@ export function Home() {
             </div>
           </dl>
         </Rise>
-        {idle && <p className="hero-hint mono">$ pera onramp 3000 &nbsp;— deposits are made from the CLI; they show up here the moment they start.</p>}
+        <CliConnect open={idle} />
       </section>
 
       <LiveFlow />
@@ -78,6 +78,80 @@ export function Home() {
 
       <History events={events} />
     </>
+  );
+}
+
+/** Deposits are made from the terminal. This mints a CLI session for this account and shows the two commands. */
+function CliConnect({ open }: { open: boolean }) {
+  const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) setShown(true);
+  }, [open]);
+  const commands = token ? `pnpm agent connect ${token}\npnpm agent onramp 3000` : "";
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      setToken(await api().cliToken());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!shown) {
+    return (
+      <p className="hero-hint mono">
+        deposits come from the terminal ·{" "}
+        <button type="button" className="term-link ink" onClick={() => setShown(true)}>
+          connect the CLI →
+        </button>
+      </p>
+    );
+  }
+  return (
+    <div className="cli-box mono">
+      <header>
+        <span>add lira from your terminal</span>
+        {token ? (
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(commands).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1400);
+              });
+            }}
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        ) : (
+          <button type="button" disabled={busy} onClick={() => void connect()}>
+            {busy ? "creating a CLI key…" : "connect the CLI →"}
+          </button>
+        )}
+      </header>
+      {token ? (
+        <pre>
+          <i>$</i> pnpm agent connect {token}
+          {"\n"}
+          <i>$</i> pnpm agent onramp 3000
+        </pre>
+      ) : (
+        <pre className="dim">
+          <i>$</i> pnpm agent connect &lt;your CLI key&gt;
+          {"\n"}
+          <i>$</i> pnpm agent onramp 3000
+        </pre>
+      )}
+      <small>{error ?? (token ? "This key is a separate session for your account, valid for 7 days. The deposit shows up here the moment it starts." : "Run these in the pera-wallet repo. The key lets the CLI act for this account without your passkey.")}</small>
+    </div>
   );
 }
 

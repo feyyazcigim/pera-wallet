@@ -218,6 +218,9 @@ export const demoBackend: Backend = {
     emit("float.topup.rejected", attempt, { code: "#3221", reason: "SpendingLimitExceeded" });
     return `Rejected on-chain: Error(Contract, #3221) SpendingLimitExceeded — tried $${attempt.toFixed(2)} with $${(attempt - 1).toFixed(2)} left under the cap.`;
   },
+  async cliToken() {
+    return "ps_demo-token-not-real";
+  },
   async setCap(capUsdc) {
     await wait(1400); // stands in for the passkey prompt + sponsored submit
     state.cap = capUsdc;

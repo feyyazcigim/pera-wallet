@@ -1096,3 +1096,52 @@ h2.section-title:not(.section-head *) {
 .section-head h2.section-title {
   font-size: 28px;
 }
+
+/* connect-the-CLI box under the balance */
+.cli-box {
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.cli-box header {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--muted);
+}
+.cli-box header button {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+.cli-box pre {
+  margin: 0;
+  padding: 14px 16px 6px;
+  font: inherit;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.cli-box pre.dim {
+  color: var(--muted);
+}
+.cli-box pre i {
+  font-style: normal;
+  color: var(--muted);
+  user-select: none;
+}
+.cli-box small {
+  display: block;
+  padding: 0 16px 14px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12.5px;
+  color: var(--muted);
+}

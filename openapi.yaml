@@ -534,6 +534,19 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /cli/token:
+    post:
+      summary: Mint a separate session for the CLI (pnpm agent connect <token>); the
+        passkey cannot be used from a terminal
+      security: *a2
+      responses:
+        "200":
+          description: "{ token, expiresAt, connect }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /agent/rules:
     get:
       summary: Router-enforced agent rules (weekly x402 limit, max price per call,
