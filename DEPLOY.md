@@ -31,10 +31,12 @@ Create a Postgres 16 service, then copy its internal connection string into the 
 Deploy the resource server first, then set `RESOURCE_SERVER_URL` on the API app and deploy it. Nixpacks builds are
 memory-hungry: deploy the two apps one at a time.
 
-## 3 · Dashboard / reference client (optional, Static)
+## 3 · Dashboard (Static)
 
-`apps/web` builds to static files: Application → Build Type **Static**, Build Path `/`, build command
-`pnpm install --frozen-lockfile && pnpm --filter @pera/web build`, publish directory `apps/web/dist`, env
+`apps/dashboard` (landing page + dashboard; `apps/web` is the bare reference client and deploys the same way) builds
+to static files: Application → Build Type **Static**, Build Path `/`, build command
+`pnpm install --frozen-lockfile && pnpm --filter @pera/dashboard build`, publish directory `apps/dashboard/dist`, with an
+SPA fallback to `index.html` (client-side routes under `/app`), env
 `VITE_API_URL=https://<api-host>`, `VITE_RESOURCE_SERVER_URL=https://<rs-host>`. Its domain must equal
 `PASSKEY_RP_ID` and appear in `PASSKEY_ORIGINS` on the API — passkeys are bound to the origin.
 

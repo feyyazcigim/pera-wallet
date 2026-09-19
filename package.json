@@ -13,6 +13,7 @@
     "test": "vitest run",
     "dev:api": "pnpm --filter @pera/api dev",
     "dev:rs": "pnpm --filter @pera/resource-server dev",
+    "dev:dashboard": "pnpm --filter @pera/dashboard dev",
     "start:api": "pnpm --filter @pera/api start",
     "start:rs": "pnpm --filter @pera/resource-server start",
     "agent": "pnpm --filter @pera/agent start",

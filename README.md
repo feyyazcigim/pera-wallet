@@ -153,6 +153,7 @@ packages/cctp            approve + deposit_for_burn, Iris polling, receiveMessag
 packages/x402-router     payFor(ctx, url): probe → parse 402 → ensureFloat cascade → pay (Stellar native | CCTP + EVM)
 apps/api                 Fastify REST API: passkey auth, provisioning, per-user routes, SSE (see openapi.yaml)
 apps/web                 reference browser client (Vite + smart-account-kit): register / login / approve agent / pay
+apps/dashboard           the product frontend (Vite + React): landing page, passkey onboarding, dashboard (home / rules / analytics)
 apps/agent               CLI = the user's agent + a software-passkey device for headless end-to-end tests
 apps/resource-server     three x402 paywalls (stellar, base, both)
 scripts/                 keys, bootstrap (global infra + legacy single-user demo), smoke tests, demo, gen-openapi
@@ -167,6 +168,7 @@ pnpm keys                      # .env with the sponsor key (+ legacy demo keys),
 pnpm bootstrap                 # sponsor funding, vault, legacy single-user demo (optional)
 pnpm dev:rs                    # paywalls on :4000
 pnpm dev:api                   # API on :3000 — embedded PGlite unless DATABASE_URL is set
+pnpm dev:dashboard             # landing page + dashboard on :5174 (passkey onboarding at /app)
 pnpm --filter @pera/web dev    # reference client on :5173 (real passkeys in the browser)
 
 # headless end-to-end with a software passkey (what the browser does, minus the biometric prompt):
