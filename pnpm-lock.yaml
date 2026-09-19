@@ -236,6 +236,9 @@ importers:
       '@pera/anchor':
         specifier: workspace:*
         version: link:../packages/anchor
+      '@pera/api':
+        specifier: workspace:*
+        version: link:../apps/api
       '@pera/cctp':
         specifier: workspace:*
         version: link:../packages/cctp

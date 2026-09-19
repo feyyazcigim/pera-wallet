@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@pera/anchor": "workspace:*",
+    "@pera/api": "workspace:*",
     "@pera/cctp": "workspace:*",
     "@pera/core": "workspace:*",
     "@pera/smart-account": "workspace:*",

@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Pera Agent Wallet API
+  version: 0.1.0
+  description: REST API consumed by the Pera dashboard. All amounts are decimal
+    USDC strings; every mutation returns tx hashes and emits an event.
+servers:
+  - url: http://localhost:3000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    OnrampBody:
+      type: object
+      properties:
+        amountTry:
+          type: string
+          pattern: ^\d+(\.\d{1,2})?$
+      required:
+        - amountTry
+      additionalProperties: false
+    OfframpBody:
+      type: object
+      properties:
+        amountUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      required:
+        - amountUsdc
+      additionalProperties: false
+    AmountBody:
+      type: object
+      properties:
+        amountUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      required:
+        - amountUsdc
+      additionalProperties: false
+    PolicyBody:
+      type: object
+      properties:
+        dailyCapUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      required:
+        - dailyCapUsdc
+      additionalProperties: false
+    PayBody:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        prefer:
+          default: auto
+          type: string
+          enum:
+            - auto
+            - stellar
+            - evm
+      required:
+        - url
+        - prefer
+      additionalProperties: false
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        ts:
+          type: string
+        type:
+          type: string
+          enum:
+            - onramp.started
+            - onramp.completed
+            - yield.deposited
+            - yield.withdrawn
+            - float.topup
+            - float.topup.rejected
+            - x402.402
+            - x402.paid
+            - bridge.burned
+            - bridge.attested
+            - bridge.minted
+            - offramp.completed
+        amountUsdc:
+          type: string
+        network:
+          type: string
+          enum:
+            - stellar:testnet
+            - eip155:84532
+        txHash:
+          type: string
+        explorerUrl:
+          type: string
+        detail:
+          type: object
+          additionalProperties: {}
+      required:
+        - id
+        - ts
+        - type
+      additionalProperties: false
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        errorCode:
+          type: number
+        detail: {}
+      required:
+        - error
+      additionalProperties: false
+paths:
+  /status:
+    get:
+      summary: Network, smart account, vault, agent, cap, Base Sepolia sponsor
+      security: []
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /balances:
+    get:
+      summary: Owner, float, smart account, vault position, Base USDC
+      security: &a1
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Balances
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401": &a2
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /onramp:
+    post:
+      summary: Start a SEP-6 TRY deposit and simulate the bank wire
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnrampBody"
+      responses:
+        "202":
+          description: "{ anchorTxId, status, instructions }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400": *a2
+  /onramp/{id}:
+    get:
+      summary: Anchor transaction status passthrough
+      security: *a1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Anchor transaction
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /offramp:
+    post:
+      summary: "SEP-6 withdraw: USDC → TRY (withdraws from the vault if needed)"
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfframpBody"
+      responses:
+        "200":
+          description: "{ anchorTxId, stellarTxHash, status, amountTry }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400": *a2
+  /yield/deposit:
+    post:
+      summary: Manual vault deposit
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountBody"
+      responses:
+        "200":
+          description: "{ amountUsdc, txHash, explorerUrl }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "503": *a2
+  /yield/withdraw:
+    post:
+      summary: Manual vault withdraw
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountBody"
+      responses:
+        "200":
+          description: "{ amountUsdc, txHash, explorerUrl }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "503": *a2
+  /yield/position:
+    get:
+      summary: Vault position and APY
+      security: *a1
+      parameters:
+        - name: fresh
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
+      responses:
+        "200":
+          description: "{ vaultId, dfTokens, underlyingUsdc, apy }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/policy:
+    get:
+      summary: Cap, period, used, remaining, rule id (read from the policy contract)
+      security: *a1
+      responses:
+        "200":
+          description: PolicyView
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      summary: Owner updates the daily cap
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyBody"
+      responses:
+        "200":
+          description: "{ ruleId, txHash, method }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/pay:
+    post:
+      summary: Run the x402 router for a URL; returns the paid body and the event
+        timeline
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayBody"
+      responses:
+        "200":
+          description: PayResult
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "409": *a2
+        "502": *a2
+  /agent/pay/over-cap-demo:
+    post:
+      summary: Attempt a top-up above the cap; returns the on-chain rejection
+      security: *a1
+      responses:
+        "200":
+          description: OverCapResult
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /events:
+    get:
+      summary: Last 200 events, newest first
+      security: *a1
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+  /events/stream:
+    get:
+      summary: Server-Sent Events feed (?token= accepted)
+      security: *a1
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/event-stream
