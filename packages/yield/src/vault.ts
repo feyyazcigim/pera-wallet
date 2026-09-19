@@ -1,4 +1,5 @@
-import { childLogger, derivedKeys, loadEnv, stellarContractUrl, submitSignedXdr, USDC_SAC } from "@pera/core";
+import { Keypair } from "@stellar/stellar-sdk";
+import { childLogger, loadEnv, stellarContractUrl, submitSignedXdr, USDC_SAC } from "@pera/core";
 import { describeDefindexError, getDefindex, NET, throttled } from "./client";
 
 const log = childLogger("yield.vault");
@@ -47,7 +48,7 @@ export interface ResolveVaultResult {
  */
 export async function resolveOrCreateVault(p: { ownerSecret: string; sponsorSecret?: string }): Promise<ResolveVaultResult> {
   const env = loadEnv();
-  const { ownerPub } = derivedKeys(env);
+  const ownerPub = Keypair.fromSecret(p.ownerSecret).publicKey();
   if (env.VAULT_ID) {
     try {
       const info = await getVaultInfo(env.VAULT_ID);
@@ -80,7 +81,7 @@ export async function resolveOrCreateVault(p: { ownerSecret: string; sponsorSecr
     throw new Error(`DeFindex createVault failed: ${describeDefindexError(err)}`);
   }
   if (!res.xdr) throw new Error(`DeFindex returned no XDR for createVault: ${JSON.stringify(res).slice(0, 300)}`);
-  const tx = await submitSignedXdr({ xdr: res.xdr, signerSecrets: [p.ownerSecret] });
+  const tx = await submitSignedXdr({ xdr: res.xdr, signerSecrets: [p.ownerSecret], sponsorSecret: p.sponsorSecret });
   const vaultId = extractVaultId(tx.returnValue);
   if (!vaultId) throw new Error(`could not read the new vault id from the factory return value: ${JSON.stringify(tx.returnValue)}`);
   log.info({ vaultId, hash: tx.hash }, "vault created");

@@ -1,11 +1,14 @@
 # Pera Agent Wallet
 
-**An AI-agent wallet on Stellar for Turkish users.** Lira goes in through a TRY anchor, idle USDC earns in a
-DeFindex vault, and an AI agent pays HTTP‑402 (x402) paywalls on Stellar — or on Base via Circle CCTP — from a
-smart account whose **daily spending cap is enforced on-chain by an OpenZeppelin policy contract**. Even a fully
-compromised agent key cannot spend more than the cap.
+**A multi-user AI-agent wallet on Stellar for Turkish users.** A user signs up with a **passkey**; that passkey
+owns an **OpenZeppelin smart account** created headlessly on Stellar, and the backend provisions a sponsored
+treasury account, an agent session key and an **EVM wallet (Privy)** for them. Lira goes in through a TRY anchor,
+idle USDC earns in a DeFindex vault, and the user's AI agent pays HTTP‑402 (x402) paywalls on Stellar — or on Base
+via Circle CCTP — under a **daily spending cap enforced on-chain by an OpenZeppelin policy contract** that the owner
+approves with their passkey. Even a fully compromised agent key cannot spend more than the cap, and the user never
+holds XLM or ETH: every fee is sponsored.
 
-Everything below runs on **Stellar testnet** with real transactions; nothing on the happy path is mocked.
+Everything below runs on **Stellar testnet / Base Sepolia** with real transactions; nothing on the happy path is mocked.
 
 | | |
 |---|---|
@@ -24,38 +27,57 @@ a *restricted signer* of a smart account, not a wallet owner.
 
 ## What the demo shows
 
-1. **On-ramp** — 200 TRY through `tr-mock-anchor` (SEP‑1/10/12/38/6). USDC lands on the owner's Stellar account.
-2. **Auto-yield** — the autopilot deposits everything above a reserve into a DeFindex vault; withdrawals are
-   instant and happen inline when the agent needs liquidity.
-3. **Capped agent** — the agent tops up its float from the smart account under a `spending_limit` policy
-   (10 USDC / rolling 24 h). A 3 USDC top-up succeeds; a 15 USDC attempt is **rejected by the policy contract**
-   (`Error(Contract, #3221) SpendingLimitExceeded`).
-4. **x402 on Stellar** — the agent hits a paywalled weather API, gets a 402, pays 0.01 USDC natively, receives
-   live Istanbul weather. The facilitator sponsors the network fee, so the float holds USDC only.
-5. **x402 on Base Sepolia** — the agent hits an `eip155:84532` paywall, burns USDC on Stellar through **Circle
-   CCTP V2**, waits for the Iris attestation, mints on Base and pays with the EVM exact scheme.
-6. **Off-ramp** — USDC back to TRY through the same anchor (SEP‑6 withdraw with an id memo).
+0. **Passkey sign-up** — the dashboard calls `smart-account-kit`'s `createWallet()` (Face ID / Touch ID), posts the
+   passkey + deploy payload to `POST /auth/register`; the API deploys the smart account with the sponsor key, verifies
+   the passkey owns rule 0, then creates the user's **treasury** and **agent** Stellar accounts with *sponsored reserves*
+   (0 XLM) and an **EVM wallet** (Privy server wallet with gas sponsorship, or a local key relayed by the sponsor).
+   Login is a standard WebAuthn assertion verified by the API (challenge + origin + rpId + P‑256 signature).
+1. **Agent approval** — the owner signs `add_context_rule` (agent signer + `spending_limit` policy) with the passkey in
+   the browser; the API re-simulates and submits it sponsored. Changing the cap is the same two-step flow
+   (`set_spending_limit` through the smart account's `execute`).
+2. **On-ramp** — 200 TRY through `tr-mock-anchor` (SEP‑1/10/12/38/6). USDC lands on the user's treasury account.
+3. **Auto-yield** — the autopilot deposits everything above a reserve from each user's treasury into the shared
+   DeFindex vault (per-user shares); withdrawals are instant and happen inline when the agent needs liquidity.
+4. **Capped agent** — the agent tops up its float from the smart account under the `spending_limit` policy
+   (10 USDC / rolling 24 h). A 0.51 USDC top-up succeeds; an attempt above the remaining cap is **rejected by the
+   policy contract** (`Error(Contract, #3221) SpendingLimitExceeded`). Usage is read back from the policy's on-chain state.
+5. **x402 on Stellar** — the agent hits a paywalled weather API, gets a 402, pays 0.01 USDC natively from its float,
+   receives live Istanbul weather. The facilitator sponsors the network fee, so the float holds USDC only.
+6. **x402 on Base Sepolia** — the agent hits an `eip155:84532` paywall, burns USDC on Stellar through **Circle
+   CCTP V2**, waits for the Iris attestation, mints to the user's EVM wallet (`receiveMessage` gas sponsored) and
+   pays with the EVM exact scheme (EIP‑3009, gasless).
+7. **Off-ramp** — USDC back to TRY through the same anchor (SEP‑6 withdraw with an id memo; sponsor pays the fee).
 
 ## Architecture
 
 ```mermaid
 flowchart TB
+  PK[Passkey · Face ID / Touch ID] -->|createWallet · signAdmin| S
   U[User · TRY] -->|SEP-6 deposit, simulated bank wire| A[TR Mock Anchor<br/>tr-mock-anchor.fly.dev]
-  A -->|USDC payment| O[Owner G-account]
-  O -->|autopilot deposit / instant withdraw| V[DeFindex vault<br/>Pera USDC Vault]
-  O -->|SAC transfer| S[OpenZeppelin smart account C-address<br/>rule 0: owner Ed25519 signer<br/>rule 1: agent signer + spending_limit policy]
-  S -->|capped transfer, agent signs, sponsor pays fee| F[Agent float G-account]
+  A -->|USDC payment| T[Treasury G-account<br/>custodial, reserves sponsored, 0 XLM]
+  T -->|autopilot deposit / instant withdraw| V[DeFindex vault<br/>Pera USDC Vault · per-user shares]
+  T -->|SAC transfer, sponsor fee-bump| S[OpenZeppelin smart account C-address<br/>rule 0: passkey owner<br/>rule 1: agent Ed25519 signer + spending_limit policy]
+  S -->|capped transfer, agent signs, sponsor pays fee| F[Agent float G-account · 0 XLM]
   F -->|x402 exact, facilitator sponsors fee| P1[402 paywall · stellar:testnet]
   F -->|approve + deposit_for_burn| C[Circle CCTP V2<br/>TokenMessengerMinter · Iris attestation]
-  C -->|receiveMessage · mint| E[EVM sponsor · Base Sepolia]
-  E -->|x402 exact, EIP-3009| P2[402 paywall · eip155:84532]
-  O -->|SEP-6 withdraw + id memo| A
-  subgraph backend [apps/api · Fastify]
-    R[x402 router<br/>probe → parse 402 → ensureFloat → pay]
-    Y[yield autopilot]
-    EV[event bus → JSONL + SSE]
+  C -->|receiveMessage, gas sponsored| E[User EVM wallet · Privy · Base Sepolia]
+  E -->|x402 exact, EIP-3009 gasless| P2[402 paywall · eip155:84532]
+  T -->|SEP-6 withdraw + id memo| A
+  subgraph backend [apps/api · Fastify + Postgres]
+    AU[passkey auth · sessions]
+    PR[provisioning · sponsored accounts · Privy wallets]
+    SU[sponsored submit of passkey-signed admin txs]
+    R[x402 router · ensureFloat cascade]
+    Y[yield autopilot per user]
+    EV[per-user event log → SSE]
   end
 ```
+
+**Key custody.** The smart account owner is the user's passkey — it never leaves the device. The backend keeps two
+custodial Ed25519 keys per user (treasury, agent), AES‑256‑GCM encrypted in Postgres under `WALLET_MASTER_KEY`; the
+agent key is worthless beyond the on-chain cap, and the treasury key can only ever move funds *into* the smart
+account, the vault or the anchor off-ramp. EVM keys live in Privy's TEE (or, without Privy credentials, encrypted
+locally). Roadmap: move the custodial Stellar keys into Privy raw-sign wallets too.
 
 **Design decision: vault-fronts-float.** `@x402/stellar` cannot use a C-address as the payer today — the client
 forces an Ed25519 signature shape, the reference facilitator rejects policy events during simulation, and its fee
@@ -76,6 +98,9 @@ on-chain: the cap is enforced inside the smart account's `__check_auth`, not by 
 | **DeFindex** (hosted API, unsigned-XDR pattern) | `packages/yield` | own vault on the Circle USDC SAC created through the factory; deposit / withdraw / balance / APY |
 | **Circle CCTP V2** (Stellar domain 27 → Base Sepolia domain 6) | `packages/cctp` | `deposit_for_burn` on `CDNG7HX…RTHP`, Iris sandbox attestation, `MessageTransmitterV2.receiveMessage` via viem |
 | **x402 v2** (`@x402/core|stellar|evm|express` 2.26.0) | `packages/x402-router`, `apps/resource-server` | facilitator `https://x402.org/facilitator` (Stellar fees sponsored, also serves `eip155:84532`); OpenZeppelin facilitator optional via `OZ_FACILITATOR_API_KEY` |
+| **Passkeys / WebAuthn** (`smart-account-kit` in the browser + own verifier) | `packages/passkey`, `apps/web`, `apps/agent` | assertion verified with WebCrypto against the on-chain owner key; software passkey for headless tests |
+| **Privy server wallets + gas sponsorship** (`@privy-io/node` 0.34) | `packages/evm` | `sponsor: true` (EIP‑7702 + paymaster) on Base Sepolia; ERC‑1271 typed-data mode for x402; falls back to local keys + sponsor EOA relay without credentials |
+| **Sponsored reserves on Stellar** | `packages/core` | `beginSponsoringFutureReserves` + `createAccount(0)` + trustline: user accounts hold no XLM |
 
 ## Skills used
 
@@ -110,72 +135,89 @@ Taken from [DEPLOYMENTS.md](DEPLOYMENTS.md); the file is the source of truth.
 pnpm workspace, TypeScript everywhere, `tsx` at runtime (no build step).
 
 ```
-packages/core            env (zod), constants, amounts (BigInt), event bus (ring + JSONL), Soroban/Horizon helpers
+packages/core            env (zod), constants, amounts (BigInt), user context, event bus, Soroban/Horizon + sponsored-account helpers
+packages/db              Postgres (or embedded PGlite for dev), migrations, AES-GCM secrets, repositories
+packages/passkey         WebAuthn assertion verification (WebCrypto) + software passkey for headless tests
 packages/anchor          SEP-1/10/12/38/6 client — on-ramp, off-ramp, quotes
-packages/smart-account   smart account deploy (bindings), attach, agent rule + policy, capped top-up, policy usage
-packages/yield           DeFindex vault create/resolve, deposit/withdraw/position, autopilot + ensureLiquidity
-packages/cctp            approve + deposit_for_burn, Iris polling, receiveMessage on Base, bridgeToBase
-packages/x402-router     payFor(url): probe → parse 402 → ensureFloat cascade → pay (Stellar native | CCTP + EVM)
-apps/api                 Fastify REST API + SSE for the dashboard (see openapi.yaml)
-apps/agent               CLI that plays the agent (run / pay / over-cap / policy / balances)
+packages/smart-account   per-user kit, deploy via bindings, sponsored submit of passkey-signed txs, agent rule, capped top-up, policy
+packages/yield           DeFindex vault create/resolve, per-user deposit/withdraw/position, autopilot + ensureLiquidity
+packages/evm             EVM wallet providers: Privy (gas sponsorship) | local (sponsor relay), USDC transfers, x402 signer
+packages/cctp            approve + deposit_for_burn, Iris polling, receiveMessage on Base, bridgeToBase, pending resume
+packages/x402-router     payFor(ctx, url): probe → parse 402 → ensureFloat cascade → pay (Stellar native | CCTP + EVM)
+apps/api                 Fastify REST API: passkey auth, provisioning, per-user routes, SSE (see openapi.yaml)
+apps/web                 reference browser client (Vite + smart-account-kit): register / login / approve agent / pay
+apps/agent               CLI = the user's agent + a software-passkey device for headless end-to-end tests
 apps/resource-server     three x402 paywalls (stellar, base, both)
-scripts/                 keys, bootstrap, onramp/policy/yield/pay smoke tests, demo, gen-openapi
+scripts/                 keys, bootstrap (global infra + legacy single-user demo), smoke tests, demo, gen-openapi
 ```
 
 ## Run it in five minutes
 
 ```bash
 corepack enable && pnpm install
-pnpm keys                      # generates .env with 3 Stellar keys + 1 EVM key, prints addresses
-# optional: DEFINDEX_API_KEY=sk_… (console.defindex.io) and Base Sepolia ETH for the printed EVM address
-pnpm bootstrap                 # friendbot, trustlines, smart account + rule, vault, on-ramp, funding, pre-bridge
+pnpm keys                      # .env with the sponsor keys (+ legacy demo keys), prints addresses
+# optional: DEFINDEX_API_KEY (console.defindex.io), Base Sepolia ETH for the EVM sponsor, PRIVY_APP_ID/SECRET, DATABASE_URL
+pnpm bootstrap                 # sponsor funding, vault, legacy single-user demo (optional)
 pnpm dev:rs                    # paywalls on :4000
-pnpm dev:api                   # API on :3000 (bearer = API_BEARER_TOKEN)
+pnpm dev:api                   # API on :3000 — embedded PGlite unless DATABASE_URL is set
+pnpm --filter @pera/web dev    # reference client on :5173 (real passkeys in the browser)
 
-pnpm smoke:onramp              # checkpoint 1 — TRY → USDC
-pnpm smoke:policy              # checkpoint 2 — 3 USDC ok, 15 USDC rejected on-chain (#3221)
-pnpm smoke:yield               # checkpoint 3 — deposit 10 / withdraw 4 (needs DEFINDEX_API_KEY)
-pnpm smoke:pay                 # checkpoint 4 — x402 on Stellar, then Base Sepolia via CCTP
-pnpm agent run --task "istanbul weather and a summary"
-pnpm agent over-cap            # exits 2 with the policy rejection
-pnpm demo                      # the pitch sequence, narrated
+# headless end-to-end with a software passkey (what the browser does, minus the biometric prompt):
+pnpm agent register --name "Ayşe"   # passkey → smart account (sponsored) → treasury/agent/EVM wallets
+pnpm agent login                     # WebAuthn assertion → session
+pnpm agent authorize --cap 10        # owner approves the agent rule (passkey-signed, sponsored submit)
+pnpm agent onramp 200                # TRY → USDC into the treasury
+pnpm agent pay http://localhost:4000/api/stellar/weather
+pnpm agent over-cap                  # exits 2 with policy error #3221
+pnpm agent set-cap 12                # passkey-signed set_spending_limit
+pnpm agent balances | policy | events
+
+pnpm smoke:onramp | smoke:policy | smoke:yield | smoke:pay   # legacy single-user checkpoints
+pnpm typecheck && pnpm test
 ```
-
-Useful checks: `curl $API/status`, `curl -H "Authorization: Bearer $T" $API/balances`,
-`curl -N "$API/events/stream?token=$T"` (live timeline), `pnpm typecheck && pnpm test`.
 
 ## REST API (for the dashboard)
 
-All amounts are decimal USDC strings. Auth is a static bearer token; `/status` and `/health` are public and
-`/events/stream` also accepts `?token=`. Full schema in [openapi.yaml](openapi.yaml).
+All amounts are decimal USDC strings. Auth: passkey login → session bearer `ps_…`; `API_BEARER_TOKEN` is the admin
+credential (`/admin/*`). `/status`, `/health` and `/auth/*` are public; `/events/stream` also accepts `?token=`.
+Full schema in [openapi.yaml](openapi.yaml).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/status` | network, smart account, vault, agent, cap, Base sponsor, facilitator |
-| GET | `/balances` | owner, float, smart account, vault position, Base USDC/ETH |
-| POST | `/onramp` `{amountTry}` | SEP‑6 deposit + simulated wire → `202 {anchorTxId}` |
-| GET | `/onramp/:id` | anchor transaction passthrough |
-| POST | `/offramp` `{amountUsdc}` | vault → owner if needed, SEP‑6 withdraw |
-| POST | `/yield/deposit` · `/yield/withdraw` `{amountUsdc}` | manual vault ops |
-| GET | `/yield/position` | shares, underlying, APY |
-| GET · POST | `/agent/policy` | cap/used/remaining read from the policy contract · owner sets a new cap |
-| POST | `/agent/pay` `{url, prefer?}` | runs the router; returns body + tx hashes + event timeline |
-| POST | `/agent/pay/over-cap-demo` | attempts an over-cap top-up; returns the on-chain rejection |
-| GET | `/events` · `/events/stream` | last 200 events · Server-Sent Events |
+| POST | `/auth/register` | passkey + `createWallet` payload → sponsored deploy, ownership check, provisioning, session |
+| POST | `/auth/login/options` · `/auth/login/verify` | WebAuthn assertion challenge / verification → session |
+| GET | `/me` · `/balances` | user + wallets · treasury, float, smart account, vault, Base USDC |
+| POST | `/agent/authorize/build` → `/agent/authorize` | build `add_context_rule` → browser signs with passkey → sponsored submit |
+| POST | `/agent/policy/build` → `/agent/policy` | same two-step flow for `set_spending_limit` |
+| POST | `/stellar/submit` `{xdr}` | sponsored submission of any passkey-signed tx on the user's smart account |
+| GET | `/agent/policy` | cap / used / remaining read from the policy contract |
+| POST | `/onramp` `{amountTry}` · GET `/onramp/:id` | SEP‑6 deposit into the treasury + simulated wire |
+| POST | `/offramp` `{amountUsdc}` | vault → treasury if needed, SEP‑6 withdraw (sponsor pays) |
+| POST | `/yield/deposit` · `/yield/withdraw` · GET `/yield/position` | vault ops on the user's position |
+| POST | `/agent/pay` `{url, prefer?}` | runs the router for the user; body + tx hashes + timeline |
+| POST | `/agent/pay/over-cap-demo` | funds the smart account, attempts an over-cap top-up, returns the rejection |
+| POST | `/evm/transfer` `{to, amountUsdc}` | gasless USDC transfer from the user's EVM wallet |
+| GET | `/events` · `/events/stream` · `/admin/events` | per-user events / SSE · all users (admin) |
 
-Event types: `onramp.started|completed`, `yield.deposited|withdrawn`, `float.topup|topup.rejected`,
-`x402.402|paid`, `bridge.burned|attested|minted`, `offramp.completed` — persisted to an append-only JSONL file.
+Event types: `user.registered`, `wallet.provisioned`, `agent.authorized`, `onramp.started|completed`,
+`yield.deposited|withdrawn`, `float.topup|topup.rejected`, `x402.402|paid`, `bridge.burned|attested|minted`,
+`offramp.completed` — persisted per user in Postgres.
 
 ## Design decisions and trade-offs
 
 - **Vault-fronts-float** (above). Pure C-address x402 payment is a roadmap item, blocked by the linked issues.
-- **Owner G-account is the DeFindex depositor.** The hosted API returns `operationXDR` for C-address callers;
-  using the owner key keeps the flow to one signed XDR. The smart account only holds the agent's capped source.
-- **Sponsor-paid fees instead of the public relayer.** The testnet relayer proxy only accepts passkey-shaped
-  deploys; our backend key (`SPONSOR_SECRET`) is the kit's `deployerSecret`, so it sources and pays every
-  smart-account transaction. The agent key never needs XLM for smart-account operations.
-- **Ed25519 owner, no passkeys.** `smart-account-kit` only deploys passkey-owned accounts, so we deploy through
-  the generated bindings with an Ed25519 External signer on rule 0 and attach the kit afterwards (canary-tested).
+- **Passkey owns the smart account; the backend holds only restricted keys.** Admin operations (agent rule, cap)
+  are signed in the browser with `kit.signAdmin` and submitted by the API with the sponsor key
+  (`resimulateAndAssemble` + fee payer), because the public relayer proxy is origin-locked and passkey-only.
+- **Treasury G-account per user is the anchor receiver and DeFindex depositor.** SEP‑6 pays classic accounts and
+  the hosted DeFindex API returns `operationXDR` for C-address callers; a custodial treasury keeps both flows to one
+  signed XDR. All treasury/agent transactions are sponsor-sourced or fee-bumped, and the accounts are created with
+  sponsored reserves, so users hold no XLM at all.
+- **EVM gas sponsorship through Privy** (`sponsor: true`, EIP‑7702 + paymaster; needs TEE + Fee sponsorship +
+  Base Sepolia enabled in the Privy dashboard). Without Privy credentials the same provider interface uses per-user
+  local keys with the sponsor EOA relaying permissionless calls and EIP‑3009 transfers — still gasless for the user.
+- **Postgres for users, passkeys, sessions, wallets and events** (PGlite embedded in dev). Custodial secrets are
+  AES‑256‑GCM encrypted under `WALLET_MASTER_KEY`.
 - **No recipient allowlist.** OpenZeppelin's policies are `simple_threshold`, `weighted_threshold` and
   `spending_limit`; the latter meters `transfer` amounts but ignores `to`. The amount cap is the load-bearing
   control; a recipient-restricting policy is on the roadmap.
@@ -192,7 +234,9 @@ Event types: `onramp.started|completed`, `yield.deposited|withdrawn`, `float.top
 
 - `@x402/stellar` C-address payer limitation (issues #3158 / #3352 / #3515) → vault-fronts-float.
 - Two testnet USDCs: the DeFindex Blend strategy wants BlendUSDC, the anchor pays Circle USDC → own vault.
-- `smart-account-kit` is passkey-only for deploy/connect in 0.8.0 → bindings deploy + headless attach.
+- `smart-account-kit` `connectWallet()` requires the indexer's birth claim and a WebAuthn ceremony → both the API
+  and the reference client re-attach with the public `kit.wallet` + private ids (pinned to 0.8.0, canary-tested).
+- Sponsored Privy transactions return `hash: ""` until confirmed → the provider polls `transactions().get(id)`.
 - `spending_limit` only meters the `transfer` context and must be installed on a `CallContract` rule at rule
   creation time; the kit's `transfer()` takes whole units while the policy limit is in stroops.
 - Two `@stellar/stellar-sdk` majors coexist (wallet-sdk pins 17.0.1, kit and x402 need ^16.3): packages exchange
@@ -208,7 +252,8 @@ Event types: `onramp.started|completed`, `yield.deposited|withdrawn`, `float.top
 2. Pure smart-account x402 payer once the client/facilitator issues land; escrow contract for facilitator-fronted
    payments (`lock / release / refund` keyed by the CCTP attestation).
 3. Recipient-allowlist policy for the agent rule; per-merchant budgets.
-4. Passkey onboarding for the owner (kit-native), Solvador as multi-chain facilitator, Near Intents for non-USDC.
+4. Custodial Stellar keys into Privy raw-sign wallets (no secrets at rest), Solvador as multi-chain facilitator,
+   Near Intents for non-USDC.
 5. LLM-driven planner (MCP tool) in `apps/agent`.
 
 ## Deployment

@@ -12,6 +12,19 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@pera/cctp": "workspace:*", "@pera/core": "workspace:*", "@pera/smart-account": "workspace:*", "@pera/yield": "workspace:*", "@stellar/stellar-sdk": "16.3.0", "@x402/core": "2.26.0", "@x402/evm": "2.26.0", "@x402/stellar": "2.26.0", "viem": "2.56.8" },
-  "devDependencies": { "typescript": "5.9.3" }
+  "dependencies": {
+    "@pera/cctp": "workspace:*",
+    "@pera/core": "workspace:*",
+    "@pera/evm": "workspace:*",
+    "@pera/smart-account": "workspace:*",
+    "@pera/yield": "workspace:*",
+    "@stellar/stellar-sdk": "16.3.0",
+    "@x402/core": "2.26.0",
+    "@x402/evm": "2.26.0",
+    "@x402/stellar": "2.26.0",
+    "viem": "2.56.8"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
 }

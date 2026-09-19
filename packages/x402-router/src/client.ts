@@ -1,36 +1,40 @@
 import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { createEd25519Signer as createX402StellarSigner, ExactStellarScheme } from "@x402/stellar";
-import { ExactEvmScheme, toClientEvmSigner } from "@x402/evm";
-import { privateKeyToAccount } from "viem/accounts";
-import { BASE_SEPOLIA_CAIP2, loadEnv, RPC_URL, STELLAR_CAIP2, type Caip2Network } from "@pera/core";
+import { ExactEvmScheme } from "@x402/evm";
+import { BASE_SEPOLIA_CAIP2, RPC_URL, STELLAR_CAIP2, type Caip2Network } from "@pera/core";
+import { x402SignerFor, type EvmWalletRef } from "@pera/evm";
 
 export type Net = Caip2Network;
 
-let stellar: x402HTTPClient | undefined;
-let evm: x402HTTPClient | undefined;
+const stellarClients = new Map<string, x402HTTPClient>();
+const evmClients = new Map<string, x402HTTPClient>();
 
-/** One HTTP client per network so offer selection is deterministic. */
-export function httpClientFor(net: Net): x402HTTPClient {
-  const env = loadEnv();
-  if (net === STELLAR_CAIP2) {
-    if (!stellar) {
-      const signer = createX402StellarSigner(env.AGENT_SECRET, STELLAR_CAIP2);
-      stellar = new x402HTTPClient(new x402Client().register("stellar:*", new ExactStellarScheme(signer, { url: RPC_URL })));
-    }
-    return stellar;
+/** Stellar payer = the user's agent float account (classic Ed25519 key). */
+export function stellarHttpClient(agentSecret: string): x402HTTPClient {
+  let c = stellarClients.get(agentSecret);
+  if (!c) {
+    const signer = createX402StellarSigner(agentSecret, STELLAR_CAIP2);
+    c = new x402HTTPClient(new x402Client().register("stellar:*", new ExactStellarScheme(signer, { url: RPC_URL })));
+    stellarClients.set(agentSecret, c);
   }
-  if (net === BASE_SEPOLIA_CAIP2) {
-    if (!env.EVM_SPONSOR_PRIVATE_KEY) throw new Error("EVM_SPONSOR_PRIVATE_KEY missing — cannot pay on Base Sepolia");
-    if (!evm) {
-      const account = privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`);
-      evm = new x402HTTPClient(new x402Client().register("eip155:*", new ExactEvmScheme(toClientEvmSigner(account))));
-    }
-    return evm;
-  }
-  throw new Error(`unsupported network ${net as string}`);
+  return c;
 }
 
-export function evmPayerAddress(): string | undefined {
-  const env = loadEnv();
-  return env.EVM_SPONSOR_PRIVATE_KEY ? privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`).address : undefined;
+/** EVM payer = the user's wallet (Privy or local) signing EIP-3009 authorizations; the facilitator pays gas. */
+export function evmHttpClient(wallet: EvmWalletRef): x402HTTPClient {
+  let c = evmClients.get(wallet.address);
+  if (!c) {
+    c = new x402HTTPClient(new x402Client().register("eip155:*", new ExactEvmScheme(x402SignerFor(wallet))));
+    evmClients.set(wallet.address, c);
+  }
+  return c;
+}
+
+export function httpClientFor(net: Net, p: { agentSecret: string; evmWallet?: EvmWalletRef }): x402HTTPClient {
+  if (net === STELLAR_CAIP2) return stellarHttpClient(p.agentSecret);
+  if (net === BASE_SEPOLIA_CAIP2) {
+    if (!p.evmWallet) throw new Error("no EVM wallet for this user");
+    return evmHttpClient(p.evmWallet);
+  }
+  throw new Error(`unsupported network ${net as string}`);
 }

@@ -5,5 +5,6 @@ export * from "./logger";
 export * from "./amount";
 export * from "./lock";
 export * from "./events";
+export * from "./context";
 export * from "./stellar";
 export * as sc from "./scval";

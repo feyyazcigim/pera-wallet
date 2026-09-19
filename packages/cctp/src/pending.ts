@@ -1,13 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { BASE_SEPOLIA_CAIP2, childLogger, events, resolveEventsFile } from "@pera/core";
-import { getBaseUsdcBalance, receiveOnBase } from "./evm";
+import { getBaseUsdcBalance, type EvmWalletRef } from "@pera/evm";
+import { receiveOnBase } from "./evm";
 import { waitForAttestation } from "./iris";
 
 const log = childLogger("cctp.pending");
 
-/** A burn that was attested (or is being attested) but not yet minted on Base — e.g. the EVM sponsor ran out of gas. */
+/** A burn that was attested but not yet minted on Base — e.g. the relayer had no gas. */
 export interface PendingBridge {
+  userId?: string;
   burnTxHash: string;
   amountUsdc: string;
   recipient: string;
@@ -39,7 +41,7 @@ export function savePending(p: PendingBridge): void {
   const list = listPending().filter((x) => x.burnTxHash !== p.burnTxHash);
   list.push(p);
   save(list);
-  log.warn({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc }, "bridge left pending; run `pnpm bridge:resume` once the EVM sponsor has Base Sepolia ETH");
+  log.warn({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc }, "bridge left pending; run `pnpm bridge:resume` once gas is available");
 }
 
 export function removePending(burnTxHash: string): void {
@@ -49,27 +51,29 @@ export function removePending(burnTxHash: string): void {
 export interface ResumeResult {
   burnTxHash: string;
   amountUsdc: string;
+  recipient: string;
   mintTxHash?: string;
   mintExplorerUrl?: string;
   error?: string;
 }
 
-/** Re-fetches the attestation for every pending burn and completes the mint on Base Sepolia. */
-export async function resumePendingBridges(onProgress?: (m: string) => void): Promise<ResumeResult[]> {
+/** Re-fetches the attestation for every pending burn and completes the mint with the given relayer wallet. */
+export async function resumePendingBridges(relayer: (p: PendingBridge) => Promise<EvmWalletRef>, onProgress?: (m: string) => void): Promise<ResumeResult[]> {
   const results: ResumeResult[] = [];
   for (const p of listPending()) {
-    onProgress?.(`resuming burn ${p.burnTxHash} (${p.amountUsdc} USDC)`);
+    onProgress?.(`resuming burn ${p.burnTxHash} (${p.amountUsdc} USDC → ${p.recipient})`);
     try {
+      const wallet = await relayer(p);
       const att = await waitForAttestation(p.burnTxHash, { timeoutMs: 120_000, onPoll: (s) => onProgress?.(`iris: ${s}`) });
-      const mint = await receiveOnBase({ message: att.message, attestation: att.attestation });
-      const baseUsdcAfter = await getBaseUsdcBalance();
-      events.emit({ type: "bridge.minted", amountUsdc: p.amountUsdc, network: BASE_SEPOLIA_CAIP2, txHash: mint.txHash, explorerUrl: mint.explorerUrl, detail: { recipient: p.recipient, baseUsdcAfter, resumed: true, burnTxHash: p.burnTxHash } });
+      const mint = await receiveOnBase({ message: att.message, attestation: att.attestation, wallet });
+      const baseUsdcAfter = await getBaseUsdcBalance(p.recipient);
+      events.emit({ type: "bridge.minted", userId: p.userId, amountUsdc: p.amountUsdc, network: BASE_SEPOLIA_CAIP2, txHash: mint.txHash, explorerUrl: mint.explorerUrl, detail: { recipient: p.recipient, baseUsdcAfter, resumed: true, burnTxHash: p.burnTxHash } });
       removePending(p.burnTxHash);
-      results.push({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc, mintTxHash: mint.txHash, mintExplorerUrl: mint.explorerUrl });
+      results.push({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc, recipient: p.recipient, mintTxHash: mint.txHash, mintExplorerUrl: mint.explorerUrl });
     } catch (err) {
       const msg = (err as Error).message;
       savePending({ ...p, lastError: msg.slice(0, 300) });
-      results.push({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc, error: msg });
+      results.push({ burnTxHash: p.burnTxHash, amountUsdc: p.amountUsdc, recipient: p.recipient, error: msg });
     }
   }
   return results;

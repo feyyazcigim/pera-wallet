@@ -2,18 +2,24 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
-import { loadEnv, repoRoot } from "@pera/core";
+import { events, loadEnv, repoRoot } from "@pera/core";
+import { insertEvent, migrate } from "@pera/db";
 import { registerAuth } from "./auth";
 import { registerErrorHandler } from "./errors";
 import { agentRoutes } from "./routes/agent";
 import { anchorRoutes } from "./routes/anchor";
+import { authRoutes } from "./routes/auth";
 import { eventRoutes } from "./routes/events";
+import { meRoutes } from "./routes/me";
 import { statusRoutes } from "./routes/status";
 import { yieldRoutes } from "./routes/yield";
 
 export async function buildApp(): Promise<FastifyInstance> {
   loadEnv();
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info", base: undefined }, disableRequestLogging: true, bodyLimit: 64 * 1024 });
+  await migrate();
+  events.setSink((e) => insertEvent({ id: e.id, userId: e.userId ?? null, ts: e.ts, type: e.type, amountUsdc: e.amountUsdc, network: e.network, txHash: e.txHash, explorerUrl: e.explorerUrl, detail: e.detail }));
+
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info", base: undefined }, disableRequestLogging: true, bodyLimit: 256 * 1024 });
   await app.register(cors, { origin: true, credentials: true, exposedHeaders: ["*"] });
   registerAuth(app);
   registerErrorHandler(app);
@@ -21,7 +27,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get("/", async () => ({
     service: "pera-api",
     docs: "/openapi.yaml",
-    routes: ["/status", "/balances", "/onramp", "/onramp/:id", "/offramp", "/yield/deposit", "/yield/withdraw", "/yield/position", "/agent/policy", "/agent/pay", "/agent/pay/over-cap-demo", "/events", "/events/stream"],
+    auth: "passkey: POST /auth/register, POST /auth/login/options, POST /auth/login/verify",
+    routes: ["/status", "/me", "/balances", "/onramp", "/onramp/:id", "/offramp", "/yield/deposit", "/yield/withdraw", "/yield/position", "/agent/policy", "/agent/authorize/build", "/agent/authorize", "/agent/policy/build", "/stellar/submit", "/agent/pay", "/agent/pay/over-cap-demo", "/evm/transfer", "/events", "/events/stream", "/admin/events"],
   }));
   app.get("/openapi.yaml", async (_req, reply) => {
     const file = path.join(repoRoot(), "openapi.yaml");
@@ -30,6 +37,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(statusRoutes);
+  await app.register(authRoutes);
+  await app.register(meRoutes);
   await app.register(anchorRoutes);
   await app.register(yieldRoutes);
   await app.register(agentRoutes);

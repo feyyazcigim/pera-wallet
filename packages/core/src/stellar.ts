@@ -302,3 +302,73 @@ export async function sacTransfer(p: { fromSecret: string; to: string; amountUsd
     sponsorSecret: p.sponsorSecret,
   });
 }
+
+/**
+ * Creates a classic account with all reserves sponsored by SPONSOR (the new account holds 0 XLM)
+ * and adds the USDC trustline in the same transaction. This is the Stellar analogue of gas
+ * sponsorship and works identically on mainnet.
+ */
+export async function createSponsoredAccount(p: { newSecret: string; sponsorSecret: string; withUsdcTrustline?: boolean }): Promise<{ created: boolean; txHash?: string }> {
+  const kp = Keypair.fromSecret(p.newSecret);
+  const sponsor = Keypair.fromSecret(p.sponsorSecret);
+  const existing = await getBalances(kp.publicKey());
+  if (existing.exists) {
+    if (p.withUsdcTrustline !== false && !existing.hasUsdcTrustline) {
+      const t = await ensureSponsoredTrustline({ accountSecret: p.newSecret, sponsorSecret: p.sponsorSecret });
+      return { created: false, txHash: t.txHash };
+    }
+    return { created: false };
+  }
+  const horizon = getHorizon();
+  const sponsorAccount = await horizon.loadAccount(sponsor.publicKey());
+  const b = new TransactionBuilder(sponsorAccount, { fee: (Number(BASE_FEE) * 10).toString(), networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(Operation.beginSponsoringFutureReserves({ sponsoredId: kp.publicKey() }))
+    .addOperation(Operation.createAccount({ destination: kp.publicKey(), startingBalance: "0" }));
+  if (p.withUsdcTrustline !== false) b.addOperation(Operation.changeTrust({ asset: usdcAsset(), source: kp.publicKey() }));
+  b.addOperation(Operation.endSponsoringFutureReserves({ source: kp.publicKey() }));
+  const tx = b.setTimeout(60).build();
+  tx.sign(sponsor, kp);
+  const res = await horizon.submitTransaction(tx);
+  log.info({ account: kp.publicKey(), hash: res.hash }, "sponsored account created");
+  return { created: true, txHash: res.hash };
+}
+
+/** Adds a USDC trustline whose reserve is sponsored by SPONSOR. */
+export async function ensureSponsoredTrustline(p: { accountSecret: string; sponsorSecret: string }): Promise<{ created: boolean; txHash?: string }> {
+  const kp = Keypair.fromSecret(p.accountSecret);
+  const sponsor = Keypair.fromSecret(p.sponsorSecret);
+  if ((await getBalances(kp.publicKey())).hasUsdcTrustline) return { created: false };
+  const horizon = getHorizon();
+  const sponsorAccount = await horizon.loadAccount(sponsor.publicKey());
+  const tx = new TransactionBuilder(sponsorAccount, { fee: (Number(BASE_FEE) * 10).toString(), networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(Operation.beginSponsoringFutureReserves({ sponsoredId: kp.publicKey() }))
+    .addOperation(Operation.changeTrust({ asset: usdcAsset(), source: kp.publicKey() }))
+    .addOperation(Operation.endSponsoringFutureReserves({ source: kp.publicKey() }))
+    .setTimeout(60)
+    .build();
+  tx.sign(sponsor, kp);
+  const res = await horizon.submitTransaction(tx);
+  return { created: true, txHash: res.hash };
+}
+
+/** Classic USDC payment where SPONSOR is the transaction source/fee payer and `fromSecret` only signs its payment op. */
+export async function sendSponsoredPayment(p: { fromSecret: string; sponsorSecret: string; destination: string; amountUsdc: string; memoId?: string }): Promise<TxResult> {
+  const from = Keypair.fromSecret(p.fromSecret);
+  const sponsor = Keypair.fromSecret(p.sponsorSecret);
+  const horizon = getHorizon();
+  const sponsorAccount = await horizon.loadAccount(sponsor.publicKey());
+  const builder = new TransactionBuilder(sponsorAccount, { fee: (Number(BASE_FEE) * 10).toString(), networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(Operation.payment({ source: from.publicKey(), destination: p.destination, asset: usdcAsset(), amount: stroopsToUsdc(usdcToStroops(p.amountUsdc)) }))
+    .setTimeout(60);
+  if (p.memoId) builder.addMemo(Memo.id(p.memoId));
+  const tx = builder.build();
+  tx.sign(sponsor, from);
+  const res = await horizon.submitTransaction(tx);
+  return { hash: res.hash, explorerUrl: stellarTxUrl(res.hash), ledger: res.ledger };
+}
+
+/** Fresh Ed25519 keypair as strings (keeps SDK objects inside core). */
+export function generateKeypair(): { publicKey: string; secret: string } {
+  const kp = Keypair.random();
+  return { publicKey: kp.publicKey(), secret: kp.secret() };
+}

@@ -6,6 +6,7 @@
 import { getBalances, derivedKeys, loadEnv, stellarContractUrl } from "@pera/core";
 import { payFor } from "@pera/x402-router";
 import { getBaseEthBalance, getBaseUsdcBalance } from "@pera/cctp";
+import { legacyContext } from "@pera/smart-account";
 import { appendDeployment } from "./lib/deployments";
 import { say } from "./lib/steps";
 
@@ -13,20 +14,22 @@ const env = loadEnv();
 const rs = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
 const stellarOnly = process.argv.includes("--stellar-only");
 const { agentPub } = derivedKeys(env);
+const evmWallet = env.EVM_SPONSOR_PRIVATE_KEY ? { provider: "local" as const, address: (await import("viem/accounts")).privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`).address, secret: env.EVM_SPONSOR_PRIVATE_KEY } : undefined;
+const ctx = { ...legacyContext(), evmWallet };
 
 const health = await fetch(`${rs}/health`).then((r) => r.json() as Promise<{ routes: string[]; payToStellar: string; payToEvm?: string }>);
 console.log(`resource server ${rs} routes ${health.routes.join(", ")}`);
 console.log(`float (agent) USDC before: ${(await getBalances(agentPub)).usdc}`);
 
 say("1/3 pay the Stellar paywall (native x402, agent float pays, facilitator sponsors fees)");
-const a = await payFor(`${rs}/api/stellar/weather`);
+const a = await payFor(ctx, `${rs}/api/stellar/weather`);
 console.log(`  paid ${a.amountUsdc} USDC on ${a.network} → tx ${a.txHash}\n  ${a.explorerUrl}`);
 console.log(`  float plan: ${JSON.stringify(a.float)}`);
 console.log(`  body: ${JSON.stringify(a.body)}`);
 appendDeployment({ kind: "tx", label: `x402 payment ${a.amountUsdc} USDC (stellar:testnet) for ${a.url}`, id: agentPub, txHash: a.txHash, network: "stellar:testnet", url: a.explorerUrl, notes: `payTo ${a.payTo}` });
 
 say("2/3 dual-network paywall — router should prefer Stellar");
-const c = await payFor(`${rs}/api/any/quote`);
+const c = await payFor(ctx, `${rs}/api/any/quote`);
 console.log(`  offers ${JSON.stringify(c.offers)} → paid on ${c.network} tx ${c.txHash}\n  ${c.explorerUrl}\n  body: ${JSON.stringify(c.body)}`);
 appendDeployment({ kind: "tx", label: `x402 payment ${c.amountUsdc} USDC (dual-offer route, Stellar chosen)`, id: agentPub, txHash: c.txHash, network: "stellar:testnet", url: c.explorerUrl });
 
@@ -40,7 +43,7 @@ if (stellarOnly || !env.EVM_SPONSOR_PRIVATE_KEY || !health.payToEvm) {
   if (Number(eth) === 0) {
     console.log("  EVM sponsor has no Base Sepolia ETH — cannot pay gas for receiveMessage; skipping.");
   } else {
-    const b = await payFor(`${rs}/api/base/summary`);
+    const b = await payFor(ctx, `${rs}/api/base/summary`);
     console.log(`  paid ${b.amountUsdc} USDC on ${b.network} → tx ${b.txHash}\n  ${b.explorerUrl}`);
     if (b.bridged) console.log(`  bridged ${b.bridged.amountUsdc} USDC: burn ${b.bridged.burnTxHash} → mint ${b.bridged.mintTxHash}`);
     console.log(`  body: ${JSON.stringify(b.body).slice(0, 200)}`);

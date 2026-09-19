@@ -25,7 +25,7 @@ export interface OnrampStart {
  * SEP-6 deposit: the anchor returns bank instructions (IBAN + reference). In the sandbox the "wire"
  * is simulated with `simulateBankTransfer`.
  */
-export async function startOnramp(p: { accountSecret: string; amountTry: string }): Promise<OnrampStart> {
+export async function startOnramp(p: { accountSecret: string; amountTry: string; userId?: string }): Promise<OnrampStart> {
   const { anchor, authToken } = await getAuthed(p.accountSecret);
   const account = publicKeyOf(p.accountSecret);
   const res = await anchor.sep6().deposit({
@@ -59,7 +59,7 @@ export async function startOnramp(p: { accountSecret: string; amountTry: string 
     minAmountTry: typeof r.min_amount === "number" ? (r.min_amount as number) : undefined,
     maxAmountTry: res.max_amount,
   };
-  events.emit({ type: "onramp.started", detail: { anchorTxId: start.id, amountTry: p.amountTry, iban: start.instructions.iban, memo: start.instructions.memo } });
+  events.emit({ type: "onramp.started", userId: p.userId, detail: { anchorTxId: start.id, amountTry: p.amountTry, iban: start.instructions.iban, memo: start.instructions.memo } });
   log.info({ id: start.id, amountTry: p.amountTry }, "onramp started");
   return start;
 }
@@ -79,6 +79,7 @@ export async function simulateBankTransfer(id: string, amountTry: string): Promi
 export async function onrampTryToUsdc(p: {
   accountSecret: string;
   amountTry: string;
+  userId?: string;
   onStatus?: (tx: AnchorTx) => void;
 }): Promise<{ start: OnrampStart; tx: AnchorTx }> {
   const start = await startOnramp(p);
@@ -86,6 +87,7 @@ export async function onrampTryToUsdc(p: {
   const tx = await waitForStatus({ accountSecret: p.accountSecret, id: start.id, onStatus: p.onStatus });
   events.emit({
     type: "onramp.completed",
+    userId: p.userId,
     amountUsdc: tx.amountOut,
     network: "stellar:testnet",
     txHash: tx.stellarTransactionId,

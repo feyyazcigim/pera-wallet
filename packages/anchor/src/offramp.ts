@@ -1,4 +1,4 @@
-import { events, sendClassicPayment, stellarTxUrl, USDC_CODE, childLogger } from "@pera/core";
+import { events, sendClassicPayment, sendSponsoredPayment, stellarTxUrl, USDC_CODE, childLogger } from "@pera/core";
 import { getAuthed } from "./client";
 import { type AnchorTx, waitForStatus } from "./transactions";
 
@@ -42,20 +42,21 @@ export async function startOfframp(p: { accountSecret: string; amountUsdc: strin
 export async function offrampUsdcToTry(p: {
   accountSecret: string;
   amountUsdc: string;
+  userId?: string;
+  /** When set, SPONSOR sources and pays the payment transaction (the user account holds no XLM). */
+  sponsorSecret?: string;
   onStatus?: (tx: AnchorTx) => void;
 }): Promise<{ start: OfframpStart; paymentTxHash: string; tx: AnchorTx }> {
   const start = await startOfframp(p);
   if (start.memoType !== "id") throw new Error(`unexpected memo type from anchor: ${start.memoType}`);
-  const payment = await sendClassicPayment({
-    sourceSecret: p.accountSecret,
-    destination: start.accountId,
-    amountUsdc: p.amountUsdc,
-    memoId: start.memo,
-  });
+  const payment = p.sponsorSecret
+    ? await sendSponsoredPayment({ fromSecret: p.accountSecret, sponsorSecret: p.sponsorSecret, destination: start.accountId, amountUsdc: p.amountUsdc, memoId: start.memo })
+    : await sendClassicPayment({ sourceSecret: p.accountSecret, destination: start.accountId, amountUsdc: p.amountUsdc, memoId: start.memo });
   log.info({ id: start.id, hash: payment.hash }, "USDC sent to anchor treasury");
   const tx = await waitForStatus({ accountSecret: p.accountSecret, id: start.id, onStatus: p.onStatus });
   events.emit({
     type: "offramp.completed",
+    userId: p.userId,
     amountUsdc: p.amountUsdc,
     network: "stellar:testnet",
     txHash: payment.hash,

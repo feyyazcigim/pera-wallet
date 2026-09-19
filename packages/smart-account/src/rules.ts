@@ -1,12 +1,14 @@
 import { Keypair } from "@stellar/stellar-sdk";
 import { createCallContractContext, createEd25519Signer as createKitEd25519Signer, createSpendingLimitParams, type ContextRule } from "smart-account-kit";
-import { childLogger, SMART_ACCOUNT, stellarTxUrl, USDC_SAC, usdcToStroops } from "@pera/core";
-import { getKit, ownerSelected, unwrapResult } from "./kit";
+import { childLogger, SMART_ACCOUNT, stellarTxUrl, USDC_SAC, usdcToStroops, type UserWalletContext } from "@pera/core";
+import { getKitFor, ownerSelected, unwrapResult } from "./kit";
 
 const log = childLogger("smart-account.rules");
 
 /** ≤ 20 UTF-8 bytes (contract limit). */
 export const AGENT_RULE_NAME = "agent-usdc-float";
+
+export type KitCtx = Pick<UserWalletContext, "smartAccountId" | "agentSecret"> & { ownerSecret?: string };
 
 export interface AgentRuleResult {
   ruleId: number;
@@ -17,57 +19,63 @@ export interface AgentRuleResult {
 }
 
 /**
- * Adds the agent's context rule: `CallContract(USDC_SAC)` with the agent's Ed25519 signer and a
- * `spending_limit` policy (cap in stroops per rolling ~24 h). Signer and policy must be created in
- * the same call because the policy's `install()` requires a CallContract rule.
+ * Builds (but does not submit) the `add_context_rule` transaction for the agent: `CallContract(USDC_SAC)`
+ * with the agent's Ed25519 signer and a `spending_limit` policy. The browser signs it with the passkey
+ * (`kit.signAdmin`) and posts the XDR to `/stellar/submit`; or, in the legacy demo, the local owner key signs.
  */
-export async function addAgentRule(p: { agentPublicKey: string; capUsdc: string }): Promise<AgentRuleResult> {
-  const kit = await getKit();
+export async function buildAgentRuleTx(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string }) {
+  const kit = await getKitFor(ctx);
   const agentSigner = createKitEd25519Signer(SMART_ACCOUNT.ed25519Verifier, Keypair.fromPublicKey(p.agentPublicKey).rawPublicKey());
-  const params = kit.convertPolicyParams(
-    "spending_limit",
-    createSpendingLimitParams(usdcToStroops(p.capUsdc), SMART_ACCOUNT.ledgersPerDay),
-  );
+  const params = kit.convertPolicyParams("spending_limit", createSpendingLimitParams(usdcToStroops(p.capUsdc), SMART_ACCOUNT.ledgersPerDay));
   const policies = new Map<string, unknown>([[SMART_ACCOUNT.spendingLimitPolicy, params]]);
-  const before = await kit.rules.count();
-
   const tx = await kit.rules.add(createCallContractContext(USDC_SAC), AGENT_RULE_NAME, [agentSigner], policies);
-  const res = await kit.multiSigners.adminOperation(tx, await ownerSelected(kit), {
-    resolveContextRuleIds: () => [0],
-    forceMethod: "rpc",
-  });
-  const { hash } = unwrapResult(res, "add_context_rule");
+  return { kit, tx };
+}
 
-  // Rule ids are a monotonic counter: the new rule is `count - 1`. Verify by name.
-  const after = await kit.rules.count();
-  let ruleId = after - 1;
-  if (after !== before + 1) {
-    const found = await findAgentRuleId();
-    if (found === null) throw new Error(`rule count moved ${before} → ${after}; could not identify the new rule`);
-    ruleId = found;
-  }
-  const { result } = await kit.rules.get(ruleId);
-  if (result.name !== AGENT_RULE_NAME) throw new Error(`rule ${ruleId} is named "${result.name}", expected "${AGENT_RULE_NAME}"`);
+/** Legacy demo: owner is a local Ed25519 key, so we can sign and submit here. */
+export async function addAgentRule(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string }): Promise<AgentRuleResult> {
+  const { kit, tx } = await buildAgentRuleTx(ctx, p);
+  const before = await kit.rules.count();
+  const res = await kit.multiSigners.adminOperation(tx, await ownerSelected(kit), { resolveContextRuleIds: () => [0], forceMethod: "rpc" });
+  const { hash } = unwrapResult(res, "add_context_rule");
+  const ruleId = await resolveNewRuleId(ctx, before);
   log.info({ ruleId, hash }, "agent rule created");
   return { ruleId, txHash: hash, explorerUrl: stellarTxUrl(hash), capUsdc: p.capUsdc, periodLedgers: SMART_ACCOUNT.ledgersPerDay };
 }
 
+/** After a submitted add_context_rule: rule ids are a monotonic counter, so the new rule is `count - 1`. */
+export async function resolveNewRuleId(ctx: KitCtx, countBefore?: number): Promise<number> {
+  const kit = await getKitFor(ctx);
+  const after = await kit.rules.count();
+  const candidate = after - 1;
+  const { result } = await kit.rules.get(candidate);
+  if (result.name === AGENT_RULE_NAME && (countBefore === undefined || after === countBefore + 1)) return candidate;
+  const found = await findAgentRuleId(ctx);
+  if (found === null) throw new Error(`could not identify the agent rule (count ${countBefore} → ${after})`);
+  return found;
+}
+
 /** Highest-id active rule named `agent-usdc-float`, or null. */
-export async function findAgentRuleId(): Promise<number | null> {
-  const kit = await getKit();
+export async function findAgentRuleId(ctx: KitCtx): Promise<number | null> {
+  const kit = await getKitFor(ctx);
   const rules = await kit.rules.list();
   const mine = rules.filter((r) => r.name === AGENT_RULE_NAME).sort((a, b) => b.id - a.id);
   return mine[0]?.id ?? null;
 }
 
-export async function getRule(ruleId: number): Promise<ContextRule> {
-  const kit = await getKit();
+export async function getRule(ctx: KitCtx, ruleId: number): Promise<ContextRule> {
+  const kit = await getKitFor(ctx);
   return (await kit.rules.get(ruleId)).result;
 }
 
-export async function removeRule(ruleId: number): Promise<{ txHash: string }> {
-  const kit = await getKit();
-  const tx = await kit.rules.remove(ruleId);
+export async function buildRemoveRuleTx(ctx: KitCtx, ruleId: number) {
+  const kit = await getKitFor(ctx);
+  return { kit, tx: await kit.rules.remove(ruleId) };
+}
+
+/** Legacy demo (local owner key). */
+export async function removeRule(ctx: KitCtx, ruleId: number): Promise<{ txHash: string }> {
+  const { kit, tx } = await buildRemoveRuleTx(ctx, ruleId);
   const res = await kit.multiSigners.adminOperation(tx, await ownerSelected(kit), { resolveContextRuleIds: () => [0], forceMethod: "rpc" });
   const { hash } = unwrapResult(res, "remove_context_rule");
   log.info({ ruleId, hash }, "rule removed");

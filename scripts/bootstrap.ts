@@ -11,6 +11,7 @@ import { cmpUsdc, derivedKeys, getBalances, loadEnv, reloadEnv, stellarAccountUr
 import { autoDeposit, isConfigured, resolveOrCreateVault } from "@pera/yield";
 import { bridgeToBase, getBaseEthBalance, getBaseUsdcBalance, getEvmAddress } from "@pera/cctp";
 import { ensureFloat } from "@pera/x402-router";
+import { legacyContext } from "@pera/smart-account";
 import { appendDeployment, upsertEnv } from "./lib/deployments";
 import { ensureAgentRule, ensureKeysFunded, ensureOwnerUsdc, ensureSmartAccount, ensureSmartAccountUsdc, ensureTrustlines, say } from "./lib/steps";
 
@@ -34,7 +35,7 @@ say("4/8 DeFindex vault");
 if (!isConfigured()) {
   console.log("  ⚠ DEFINDEX_API_KEY not set — skipping vault creation (no yield until a key is added; nothing is mocked).");
 } else {
-  const v = await resolveOrCreateVault({ ownerSecret: env.OWNER_SECRET });
+  const v = await resolveOrCreateVault({ ownerSecret: env.OWNER_SECRET!, sponsorSecret: env.SPONSOR_SECRET });
   if (v.created || env.VAULT_ID !== v.vaultId) {
     upsertEnv("VAULT_ID", v.vaultId);
     appendDeployment({ kind: "vault", label: "DeFindex vault on Circle USDC (Pera USDC Vault / pUSDC, 20% of yield to owner)", id: v.vaultId, txHash: v.txHash, network: "stellar:testnet", url: v.explorerUrl, notes: "no Blend strategy for this asset on testnet: idle-only vault" });
@@ -50,7 +51,7 @@ say("6/8 fund the smart account (≥ 15 USDC)");
 await ensureSmartAccountUsdc("15", env);
 
 say("7/8 auto-deposit idle USDC into the vault");
-const auto = await autoDeposit();
+const auto = await autoDeposit(legacyContext());
 console.log(auto.deposited ? `  deposited ${auto.deposited} USDC (${auto.txHash})` : `  skipped: ${auto.skipped}`);
 if (auto.deposited && auto.txHash) appendDeployment({ kind: "tx", label: `autopilot deposit ${auto.deposited} USDC`, id: env.VAULT_ID, txHash: auto.txHash, network: "stellar:testnet", url: `https://stellar.expert/explorer/testnet/tx/${auto.txHash}` });
 
@@ -63,8 +64,11 @@ else {
   if (Number(eth) === 0) console.log(`  skipped: ${evm} has no Base Sepolia ETH for gas (fund it and re-run)`);
   else if (cmpUsdc(usdc, "1") >= 0) console.log(`  skipped: Base already holds ${usdc} USDC`);
   else {
-    await ensureFloat({ neededUsdc: "2" });
-    const b = await bridgeToBase({ amountUsdc: "2", onProgress: (m) => console.log(`    ${m}`) });
+    const lc = legacyContext();
+    await ensureFloat(lc, { neededUsdc: "2" });
+    const { privateKeyToAccount } = await import("viem/accounts");
+    const evmWallet = { provider: "local" as const, address: privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`).address, secret: env.EVM_SPONSOR_PRIVATE_KEY };
+    const b = await bridgeToBase({ userId: lc.userId, agentSecret: lc.agentSecret, agentPub: lc.agentPub, evmWallet }, { amountUsdc: "2", onProgress: (m) => console.log(`    ${m}`) });
     appendDeployment({ kind: "tx", label: `CCTP burn ${b.amountUsdc} USDC (Stellar → Base Sepolia)`, id: keys.agentPub, txHash: b.burnTxHash, network: "stellar:testnet", url: b.burnExplorerUrl });
     appendDeployment({ kind: "tx", label: `CCTP mint ${b.amountUsdc} USDC on Base Sepolia`, id: evm, txHash: b.mintTxHash, network: "eip155:84532", url: b.mintExplorerUrl });
     console.log(`  bridged ${b.amountUsdc} USDC → Base balance ${b.baseUsdcAfter}`);

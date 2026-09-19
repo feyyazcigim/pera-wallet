@@ -2,8 +2,10 @@ openapi: 3.0.3
 info:
   title: Pera Agent Wallet API
   version: 0.1.0
-  description: REST API consumed by the Pera dashboard. All amounts are decimal
-    USDC strings; every mutation returns tx hashes and emits an event.
+  description: "Multi-user REST API for the Pera dashboard. Auth: passkey
+    (WebAuthn) → session bearer `ps_…`; the static API_BEARER_TOKEN is the admin
+    credential. All amounts are decimal USDC strings; every mutation returns tx
+    hashes and emits a per-user event."
 servers:
   - url: http://localhost:3000
 components:
@@ -12,6 +14,109 @@ components:
       type: http
       scheme: bearer
   schemas:
+    RegisterBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+        credentialId:
+          type: string
+          minLength: 8
+        publicKey:
+          type: string
+          minLength: 80
+        contractId:
+          type: string
+          pattern: ^C[A-Z2-7]{55}$
+        relayerPayload:
+          type: object
+          properties:
+            func:
+              type: string
+            auth:
+              type: array
+              items:
+                type: string
+          required:
+            - func
+            - auth
+          additionalProperties: false
+        dailyCapUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      required:
+        - displayName
+        - credentialId
+        - publicKey
+        - contractId
+      additionalProperties: false
+    LoginOptionsBody:
+      type: object
+      properties:
+        credentialId:
+          type: string
+      additionalProperties: false
+    LoginVerifyBody:
+      type: object
+      properties:
+        challenge:
+          type: string
+        assertion:
+          type: object
+          properties:
+            id:
+              type: string
+            rawId:
+              type: string
+            type:
+              type: string
+            response:
+              type: object
+              properties:
+                clientDataJSON:
+                  type: string
+                authenticatorData:
+                  type: string
+                signature:
+                  type: string
+                userHandle:
+                  nullable: true
+                  type: string
+              required:
+                - clientDataJSON
+                - authenticatorData
+                - signature
+              additionalProperties: false
+          required:
+            - id
+            - response
+          additionalProperties: false
+      required:
+        - challenge
+        - assertion
+      additionalProperties: false
+    XdrBody:
+      type: object
+      properties:
+        xdr:
+          type: string
+          minLength: 20
+      required:
+        - xdr
+      additionalProperties: false
+    AuthorizeBuildBody:
+      type: object
+      properties:
+        dailyCapUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      additionalProperties: false
     OnrampBody:
       type: object
       properties:
@@ -65,6 +170,19 @@ components:
         - url
         - prefer
       additionalProperties: false
+    EvmTransferBody:
+      type: object
+      properties:
+        to:
+          type: string
+          pattern: ^0x[0-9a-fA-F]{40}$
+        amountUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      required:
+        - to
+        - amountUsdc
+      additionalProperties: false
     Event:
       type: object
       properties:
@@ -74,19 +192,8 @@ components:
           type: string
         type:
           type: string
-          enum:
-            - onramp.started
-            - onramp.completed
-            - yield.deposited
-            - yield.withdrawn
-            - float.topup
-            - float.topup.rejected
-            - x402.402
-            - x402.paid
-            - bridge.burned
-            - bridge.attested
-            - bridge.minted
-            - offramp.completed
+        userId:
+          type: string
         amountUsdc:
           type: string
         network:
@@ -122,7 +229,8 @@ components:
 paths:
   /status:
     get:
-      summary: Network, smart account, vault, agent, cap, Base Sepolia sponsor
+      summary: Network, sponsor, smart-account artefacts, vault, EVM provider,
+        facilitator (public)
       security: []
       responses:
         "200":
@@ -132,11 +240,99 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /auth/register:
+    post:
+      summary: Register a passkey-owned smart account (deploy payload from
+        smart-account-kit createWallet) and provision treasury/agent/EVM wallets
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: "{ token, expiresAt, user, wallets }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400": &a1
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403": *a1
+        "409": *a1
+  /auth/login/options:
+    post:
+      summary: WebAuthn assertion options (challenge, rpId, allowCredentials)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginOptionsBody"
+      responses:
+        "200":
+          description: "{ challenge, rpId, allowCredentials }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /auth/login/verify:
+    post:
+      summary: Verify the passkey assertion → session token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginVerifyBody"
+      responses:
+        "200":
+          description: "{ token, expiresAt, user, wallets }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401": *a1
+  /auth/logout:
+    post:
+      summary: Invalidate the session
+      security: &a2
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "{ ok }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /me:
+    get:
+      summary: User + wallets (smart account, treasury, agent, cap, EVM)
+      security: *a2
+      responses:
+        "200":
+          description: Me
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401": *a1
   /balances:
     get:
-      summary: Owner, float, smart account, vault position, Base USDC
-      security: &a1
-        - bearerAuth: []
+      summary: Treasury, float, smart account, vault position, Base USDC
+      security: *a2
       responses:
         "200":
           description: Balances
@@ -145,16 +341,11 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "401": &a2
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+        "401": *a1
   /onramp:
     post:
-      summary: Start a SEP-6 TRY deposit and simulate the bank wire
-      security: *a1
+      summary: SEP-6 TRY deposit into the user's treasury + simulated wire
+      security: *a2
       requestBody:
         required: true
         content:
@@ -163,17 +354,17 @@ paths:
               $ref: "#/components/schemas/OnrampBody"
       responses:
         "202":
-          description: "{ anchorTxId, status, instructions }"
+          description: "{ anchorTxId, status, instructions, destination }"
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: true
-        "400": *a2
+        "400": *a1
   /onramp/{id}:
     get:
-      summary: Anchor transaction status passthrough
-      security: *a1
+      summary: Anchor transaction passthrough
+      security: *a2
       parameters:
         - name: id
           in: path
@@ -190,8 +381,9 @@ paths:
                 additionalProperties: true
   /offramp:
     post:
-      summary: "SEP-6 withdraw: USDC → TRY (withdraws from the vault if needed)"
-      security: *a1
+      summary: SEP-6 withdraw USDC → TRY (vault → treasury first if needed; sponsor
+        pays)
+      security: *a2
       requestBody:
         required: true
         content:
@@ -206,11 +398,11 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "400": *a2
+        "400": *a1
   /yield/deposit:
     post:
-      summary: Manual vault deposit
-      security: *a1
+      summary: Manual vault deposit (treasury → vault)
+      security: *a2
       requestBody:
         required: true
         content:
@@ -225,11 +417,11 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "503": *a2
+        "503": *a1
   /yield/withdraw:
     post:
       summary: Manual vault withdraw
-      security: *a1
+      security: *a2
       requestBody:
         required: true
         content:
@@ -244,11 +436,11 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "503": *a2
+        "503": *a1
   /yield/position:
     get:
       summary: Vault position and APY
-      security: *a1
+      security: *a2
       parameters:
         - name: fresh
           in: query
@@ -266,8 +458,9 @@ paths:
                 additionalProperties: true
   /agent/policy:
     get:
-      summary: Cap, period, used, remaining, rule id (read from the policy contract)
-      security: *a1
+      summary: Cap, used, remaining, rule id — read from the spending_limit policy
+        contract
+      security: *a2
       responses:
         "200":
           description: PolicyView
@@ -277,8 +470,27 @@ paths:
                 type: object
                 additionalProperties: true
     post:
-      summary: Owner updates the daily cap
-      security: *a1
+      summary: Submit the passkey-signed cap change (built by /agent/policy/build)
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XdrBody"
+      responses:
+        "200":
+          description: "{ ruleId, txHash, dailyCapUsdc }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/policy/build:
+    post:
+      summary: Build set_spending_limit for passkey signing
+        (kit.wallet.fromJSON.execute → kit.signAdmin)
+      security: *a2
       requestBody:
         required: true
         content:
@@ -287,7 +499,63 @@ paths:
               $ref: "#/components/schemas/PolicyBody"
       responses:
         "200":
-          description: "{ ruleId, txHash, method }"
+          description: "{ json, xdr, ruleId, dailyCapUsdc }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/authorize/build:
+    post:
+      summary: Build add_context_rule (agent signer + spending_limit) for passkey
+        signing
+      security: *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizeBuildBody"
+      responses:
+        "200":
+          description: "{ json, xdr, agentPublicKey, dailyCapUsdc, ruleName,
+            smartAccountId }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/authorize:
+    post:
+      summary: Submit the passkey-signed rule transaction sponsored; records the rule id
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XdrBody"
+      responses:
+        "200":
+          description: "{ ruleId, txHash, explorerUrl }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /stellar/submit:
+    post:
+      summary: Sponsored submission of any passkey-signed transaction targeting the
+        user's smart account
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XdrBody"
+      responses:
+        "200":
+          description: "{ hash, explorerUrl, ledger }"
           content:
             application/json:
               schema:
@@ -295,9 +563,9 @@ paths:
                 additionalProperties: true
   /agent/pay:
     post:
-      summary: Run the x402 router for a URL; returns the paid body and the event
-        timeline
-      security: *a1
+      summary: Run the x402 router for a URL; returns the paid body, tx hashes and the
+        event timeline
+      security: *a2
       requestBody:
         required: true
         content:
@@ -312,12 +580,13 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "409": *a2
-        "502": *a2
+        "409": *a1
+        "502": *a1
   /agent/pay/over-cap-demo:
     post:
-      summary: Attempt a top-up above the cap; returns the on-chain rejection
-      security: *a1
+      summary: Fund the smart account then attempt a top-up above the cap; returns the
+        on-chain rejection
+      security: *a2
       responses:
         "200":
           description: OverCapResult
@@ -326,10 +595,30 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        "409": *a1
+  /evm/transfer:
+    post:
+      summary: Gasless USDC transfer from the user's EVM wallet (Privy sponsorship or
+        EIP-3009 relay)
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvmTransferBody"
+      responses:
+        "200":
+          description: "{ hash, explorerUrl, sponsored }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /events:
     get:
-      summary: Last 200 events, newest first
-      security: *a1
+      summary: User's last 200 events, newest first
+      security: *a2
       responses:
         "200":
           description: Events
@@ -341,8 +630,8 @@ paths:
                   $ref: "#/components/schemas/Event"
   /events/stream:
     get:
-      summary: Server-Sent Events feed (?token= accepted)
-      security: *a1
+      summary: Server-Sent Events feed for the user (?token= accepted)
+      security: *a2
       parameters:
         - name: token
           in: query
@@ -351,3 +640,16 @@ paths:
       responses:
         "200":
           description: text/event-stream
+  /admin/events:
+    get:
+      summary: All users' events (admin bearer)
+      security: *a2
+      responses:
+        "200":
+          description: Event[]
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403": *a1

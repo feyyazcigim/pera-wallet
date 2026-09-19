@@ -15,7 +15,7 @@ import {
   type Env,
 } from "@pera/core";
 import { onrampTryToUsdc } from "@pera/anchor";
-import { addAgentRule, deploySmartAccount, findAgentRuleId, resetKit } from "@pera/smart-account";
+import { addAgentRule, deploySmartAccount, findAgentRuleId, legacyContext, resetKit } from "@pera/smart-account";
 import { appendDeployment, upsertEnv } from "./deployments";
 
 export const say = (msg: string) => console.log(`\n▶ ${msg}`);
@@ -33,8 +33,8 @@ export async function ensureKeysFunded(env: Env = loadEnv()): Promise<void> {
 
 export async function ensureTrustlines(env: Env = loadEnv()): Promise<void> {
   for (const [label, secret] of [
-    ["owner", env.OWNER_SECRET],
-    ["agent", env.AGENT_SECRET],
+    ["owner", env.OWNER_SECRET!],
+    ["agent", env.AGENT_SECRET!],
   ] as const) {
     const r = await ensureUsdcTrustline(secret);
     console.log(`  ${label} USDC trustline ${r.created ? `created (${r.txHash})` : "present"}`);
@@ -46,6 +46,7 @@ export async function ensureSmartAccount(env: Env = loadEnv()): Promise<string> 
     console.log(`  smart account present ${env.SMART_ACCOUNT_ID}`);
     return env.SMART_ACCOUNT_ID;
   }
+  if (!env.OWNER_SECRET) throw new Error("OWNER_SECRET missing (legacy demo keys: run `pnpm keys`)");
   const r = await deploySmartAccount({ ownerSecret: env.OWNER_SECRET, sponsorSecret: env.SPONSOR_SECRET });
   upsertEnv("SMART_ACCOUNT_ID", r.contractId);
   appendDeployment({ kind: "contract", label: "OpenZeppelin smart account (owner = Ed25519 signer on rule 0)", id: r.contractId, txHash: r.txHash, network: "stellar:testnet", url: r.contractUrl });
@@ -61,7 +62,7 @@ export async function ensureAgentRule(env: Env = loadEnv()): Promise<number> {
     console.log(`  agent rule present #${env.AGENT_RULE_ID}`);
     return env.AGENT_RULE_ID;
   }
-  const existing = await findAgentRuleId();
+  const existing = await findAgentRuleId(legacyContext());
   if (existing !== null) {
     upsertEnv("AGENT_RULE_ID", String(existing));
     console.log(`  agent rule found on-chain #${existing}`);
@@ -69,7 +70,7 @@ export async function ensureAgentRule(env: Env = loadEnv()): Promise<number> {
     return existing;
   }
   const { agentPub } = derivedKeys(env);
-  const r = await addAgentRule({ agentPublicKey: agentPub, capUsdc: env.AGENT_DAILY_CAP_USDC });
+  const r = await addAgentRule(legacyContext(), { agentPublicKey: agentPub, capUsdc: env.AGENT_DAILY_CAP_USDC });
   upsertEnv("AGENT_RULE_ID", String(r.ruleId));
   appendDeployment({
     kind: "rule",
@@ -95,7 +96,7 @@ export async function ensureOwnerUsdc(minUsdc: string, env: Env = loadEnv()): Pr
   }
   console.log(`  owner USDC ${bal} < ${minUsdc}; on-ramping ${env.BOOTSTRAP_ONRAMP_TRY} TRY …`);
   const { start, tx } = await onrampTryToUsdc({
-    accountSecret: env.OWNER_SECRET,
+    accountSecret: env.OWNER_SECRET!,
     amountTry: env.BOOTSTRAP_ONRAMP_TRY,
     onStatus: (t) => console.log(`    anchor status → ${t.status}`),
   });
@@ -121,7 +122,7 @@ export async function ensureSmartAccountUsdc(minUsdc: string, env: Env = loadEnv
     return bal;
   }
   const amount = subUsdc(minUsdc, bal);
-  const r = await sacTransfer({ fromSecret: env.OWNER_SECRET, to: env.SMART_ACCOUNT_ID, amountUsdc: amount, sponsorSecret: env.SPONSOR_SECRET });
+  const r = await sacTransfer({ fromSecret: env.OWNER_SECRET!, to: env.SMART_ACCOUNT_ID, amountUsdc: amount, sponsorSecret: env.SPONSOR_SECRET });
   appendDeployment({ kind: "tx", label: `owner → smart account ${amount} USDC`, id: env.SMART_ACCOUNT_ID, txHash: r.hash, network: "stellar:testnet", url: r.explorerUrl, notes: stellarContractUrl(env.SMART_ACCOUNT_ID) });
   const after = await getContractUsdcBalance(env.SMART_ACCOUNT_ID);
   console.log(`  smart account funded +${amount} USDC → ${after}\n  ${r.explorerUrl}`);

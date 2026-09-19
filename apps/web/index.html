@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pera Agent Wallet — reference client</title>
+    <style>
+      :root { --bg:#0f1115; --card:#171a21; --fg:#e8e8ea; --muted:#9aa0aa; --accent:#6cc4ff; --ok:#5fd38d; --bad:#ff7b7b; }
+      body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 ui-sans-serif,system-ui,sans-serif; }
+      main { max-width:960px; margin:0 auto; padding:24px 16px; }
+      h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:15px; margin:0 0 8px; color:var(--accent); }
+      .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+      .card { background:var(--card); border:1px solid #262a33; border-radius:10px; padding:14px; }
+      button { background:var(--accent); color:#06121c; border:0; border-radius:6px; padding:8px 12px; font-weight:600; cursor:pointer; margin:4px 4px 4px 0; }
+      button.secondary { background:#2a2f3a; color:var(--fg); }
+      input { background:#0f1115; color:var(--fg); border:1px solid #2a2f3a; border-radius:6px; padding:8px; width:100%; box-sizing:border-box; margin:4px 0; }
+      pre { background:#0b0d11; border:1px solid #262a33; border-radius:8px; padding:10px; overflow:auto; max-height:260px; font-size:12px; }
+      .muted { color:var(--muted); } .ok { color:var(--ok); } .bad { color:var(--bad); }
+      #log div { border-bottom:1px solid #22262e; padding:4px 0; font-family:ui-monospace,monospace; font-size:12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pera Agent Wallet · reference client</h1>
+      <p class="muted">Passkey-owned Stellar smart account (OpenZeppelin, via smart-account-kit) + sponsored everything. API: <code id="apiUrl"></code></p>
+      <div class="grid">
+        <section class="card">
+          <h2>1 · Register (passkey → smart account)</h2>
+          <input id="name" placeholder="display name" value="Demo User" />
+          <input id="email" placeholder="email (optional)" />
+          <button id="register">Create passkey &amp; wallet</button>
+          <button id="login" class="secondary">Login with passkey</button>
+          <button id="logout" class="secondary">Logout</button>
+          <pre id="me">not logged in</pre>
+        </section>
+        <section class="card">
+          <h2>2 · Authorise the agent (owner signs with passkey)</h2>
+          <input id="cap" placeholder="daily cap USDC" value="10" />
+          <button id="authorize">Approve agent rule</button>
+          <button id="setcap" class="secondary">Change cap</button>
+          <pre id="policy">—</pre>
+        </section>
+        <section class="card">
+          <h2>3 · Fund (TRY on-ramp) &amp; balances</h2>
+          <input id="try" placeholder="TRY amount" value="200" />
+          <button id="onramp">On-ramp TRY</button>
+          <button id="balances" class="secondary">Refresh balances</button>
+          <pre id="bal">—</pre>
+        </section>
+        <section class="card">
+          <h2>4 · Agent pays x402 paywalls</h2>
+          <input id="url" placeholder="paywalled URL" />
+          <button id="pay">Pay (auto)</button>
+          <button id="payevm" class="secondary">Pay on Base (CCTP)</button>
+          <button id="overcap" class="secondary">Over-cap demo</button>
+          <pre id="pay-out">—</pre>
+        </section>
+      </div>
+      <section class="card" style="margin-top:12px">
+        <h2>Live timeline (SSE)</h2>
+        <div id="log"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

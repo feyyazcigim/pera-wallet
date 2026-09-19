@@ -12,7 +12,7 @@ const amountTry = process.argv[2] ?? "200";
 
 console.log(`owner ${ownerPub}`);
 await ensureFunded(ownerPub);
-const tl = await ensureUsdcTrustline(env.OWNER_SECRET);
+const tl = await ensureUsdcTrustline(env.OWNER_SECRET!);
 if (tl.created) console.log(`USDC trustline created: ${stellarTxUrl(tl.txHash!)}`);
 
 const before = await getBalances(ownerPub);
@@ -20,7 +20,7 @@ console.log(`USDC before: ${before.usdc}`);
 console.log(`on-ramping ${amountTry} TRY …`);
 
 const { start, tx } = await onrampTryToUsdc({
-  accountSecret: env.OWNER_SECRET,
+  accountSecret: env.OWNER_SECRET!,
   amountTry,
   onStatus: (t) => console.log(`  status → ${t.status}${t.message ? ` (${t.message})` : ""}`),
 });

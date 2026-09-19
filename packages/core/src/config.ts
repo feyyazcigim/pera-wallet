@@ -16,8 +16,9 @@ const opt = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((v) => (v === "" || v === undefined ? undefined : v), schema.optional());
 
 export const EnvSchema = z.object({
-  OWNER_SECRET: StellarSecret,
-  AGENT_SECRET: StellarSecret,
+  /** Legacy single-user demo keys (scripts). Multi-user wallets live in the database. */
+  OWNER_SECRET: opt(StellarSecret),
+  AGENT_SECRET: opt(StellarSecret),
   SPONSOR_SECRET: StellarSecret,
   EVM_SPONSOR_PRIVATE_KEY: opt(EvmPrivateKey),
 
@@ -35,6 +36,14 @@ export const EnvSchema = z.object({
   AUTOPILOT: z.enum(["on", "off"]).default("on"),
 
   API_BEARER_TOKEN: z.string().min(6).default("change-me"),
+  DATABASE_URL: opt(z.string()),
+  WALLET_MASTER_KEY: z.string().min(16).default("dev-master-key-change-me-please"),
+  PASSKEY_RP_ID: z.string().default("localhost"),
+  PASSKEY_ORIGINS: z.string().default("http://localhost:5173,http://localhost:3000"),
+  PRIVY_APP_ID: opt(z.string()),
+  PRIVY_APP_SECRET: opt(z.string()),
+  PRIVY_AUTHORIZATION_PRIVATE_KEY: opt(z.string()),
+  PRIVY_GAS_SPONSORSHIP: z.enum(["on", "off"]).default("on"),
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
   RESOURCE_SERVER_URL: z.string().url().default("http://localhost:4000"),
   EVENTS_FILE: z.string().default("./data/events.jsonl"),
@@ -120,11 +129,16 @@ export interface DerivedKeys {
   sponsorPub: string;
 }
 
-/** Public keys derived from the secrets (strings only — safe to hand to any package). */
+/** Public keys of the legacy single-user demo keys (throws if OWNER/AGENT are unset). */
 export function derivedKeys(env: Env = loadEnv()): DerivedKeys {
+  if (!env.OWNER_SECRET || !env.AGENT_SECRET) throw new Error("OWNER_SECRET / AGENT_SECRET not set (single-user demo keys); use the multi-user API instead");
   return {
     ownerPub: Keypair.fromSecret(env.OWNER_SECRET).publicKey(),
     agentPub: Keypair.fromSecret(env.AGENT_SECRET).publicKey(),
     sponsorPub: Keypair.fromSecret(env.SPONSOR_SECRET).publicKey(),
   };
+}
+
+export function sponsorPublicKey(env: Env = loadEnv()): string {
+  return Keypair.fromSecret(env.SPONSOR_SECRET).publicKey();
 }

@@ -13,6 +13,17 @@
     "typecheck": "tsc --noEmit",
     "start": "tsx src/index.ts"
   },
-  "dependencies": { "@pera/core": "workspace:*", "commander": "15.0.0", "tsx": "4.23.13" },
-  "devDependencies": { "typescript": "5.9.3" }
+  "dependencies": {
+    "@pera/core": "workspace:*",
+    "@pera/passkey": "workspace:*",
+    "@pera/smart-account": "workspace:*",
+    "@stellar/stellar-sdk": "16.3.0",
+    "commander": "15.0.0",
+    "smart-account-kit": "0.8.0",
+    "smart-account-kit-bindings": "0.4.0",
+    "tsx": "4.23.13"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
 }

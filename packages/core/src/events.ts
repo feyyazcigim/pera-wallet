@@ -7,6 +7,9 @@ import { logger } from "./logger";
 import type { Caip2Network } from "./constants";
 
 export type EventType =
+  | "user.registered"
+  | "wallet.provisioned"
+  | "agent.authorized"
   | "onramp.started"
   | "onramp.completed"
   | "yield.deposited"
@@ -24,6 +27,7 @@ export interface WalletEvent {
   id: string;
   ts: string;
   type: EventType;
+  userId?: string;
   amountUsdc?: string;
   network?: Caip2Network;
   txHash?: string;
@@ -33,31 +37,36 @@ export interface WalletEvent {
 
 export type EventInput = Omit<WalletEvent, "id" | "ts">;
 type Listener = (e: WalletEvent) => void;
+export type EventSink = (e: WalletEvent) => Promise<void> | void;
 
 /**
- * In-memory ring buffer + append-only JSONL file. Every mutation in the system emits exactly
- * one event here; the API's `/events` and SSE stream are fed from this bus.
+ * Process-wide event bus: in-memory ring buffer for SSE fan-out + a persistence sink. The API
+ * installs a database sink; without one, events are appended to a JSONL file.
  */
 export class EventBus {
   private ring: WalletEvent[] = [];
   private listeners = new Set<Listener>();
+  private sink?: EventSink;
   private initialised = false;
   private file?: string;
 
-  constructor(
-    private readonly opts: { file?: string; ringSize?: number } = {},
-  ) {}
+  constructor(private readonly opts: { file?: string; ringSize?: number } = {}) {}
+
+  /** Replace the JSONL fallback with a custom persistence sink (e.g. Postgres). */
+  setSink(sink: EventSink): void {
+    this.sink = sink;
+  }
 
   private ensureInit(): void {
     if (this.initialised) return;
     this.initialised = true;
+    if (this.sink) return;
     this.file = this.opts.file ?? resolveEventsFile();
     try {
       mkdirSync(path.dirname(this.file), { recursive: true });
       if (existsSync(this.file)) {
-        const lines = readFileSync(this.file, "utf8").split("\n").filter(Boolean);
         const size = this.opts.ringSize ?? 2000;
-        for (const line of lines.slice(-size)) {
+        for (const line of readFileSync(this.file, "utf8").split("\n").filter(Boolean).slice(-size)) {
           try {
             this.ring.push(JSON.parse(line) as WalletEvent);
           } catch {
@@ -77,14 +86,16 @@ export class EventBus {
     this.ring.push(event);
     const size = this.opts.ringSize ?? 2000;
     if (this.ring.length > size) this.ring.splice(0, this.ring.length - size);
-    if (this.file) {
+    if (this.sink) {
+      Promise.resolve(this.sink(event)).catch((err) => logger.warn({ err }, "event sink failed"));
+    } else if (this.file) {
       try {
         appendFileSync(this.file, `${JSON.stringify(event)}\n`);
       } catch (err) {
         logger.warn({ err }, "failed to append event");
       }
     }
-    logger.info({ event: event.type, amountUsdc: event.amountUsdc, txHash: event.txHash }, "event");
+    logger.info({ event: event.type, userId: event.userId, amountUsdc: event.amountUsdc, txHash: event.txHash }, "event");
     for (const l of this.listeners) {
       try {
         l(event);
@@ -95,24 +106,25 @@ export class EventBus {
     return event;
   }
 
-  /** Newest first. */
-  recent(limit = 200): WalletEvent[] {
+  /** Newest first, optionally filtered by user (from the in-memory ring). */
+  recent(limit = 200, userId?: string): WalletEvent[] {
     this.ensureInit();
-    return this.ring.slice(-limit).reverse();
+    const src = userId ? this.ring.filter((e) => e.userId === userId) : this.ring;
+    return src.slice(-limit).reverse();
   }
 
-  subscribe(fn: Listener): () => void {
+  subscribe(fn: Listener, userId?: string): () => void {
     this.ensureInit();
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+    const wrapped: Listener = userId ? (e) => { if (e.userId === userId) fn(e); } : fn;
+    this.listeners.add(wrapped);
+    return () => this.listeners.delete(wrapped);
   }
 
-  /** Decimal USDC sum of `amountUsdc` over events of `type` newer than `sinceMs` epoch. */
-  sumSince(type: EventType, sinceMs: number): string {
+  sumSince(type: EventType, sinceMs: number, userId?: string): string {
     this.ensureInit();
     let total = "0";
     for (const e of this.ring) {
-      if (e.type === type && e.amountUsdc && Date.parse(e.ts) >= sinceMs) total = addUsdc(total, e.amountUsdc);
+      if (e.type === type && e.amountUsdc && Date.parse(e.ts) >= sinceMs && (!userId || e.userId === userId)) total = addUsdc(total, e.amountUsdc);
     }
     return total;
   }

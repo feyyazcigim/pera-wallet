@@ -1,7 +1,13 @@
 # Deploying on Dokploy (Nixpacks)
 
-Two Applications from this repository, both **Build Type = Nixpacks** and **Build Path = `/`** (the repo root
-must be the build context so `pnpm-workspace.yaml`, the lockfile and `packages/*` are present).
+Three services from this repository: two Nixpacks Applications (API, resource server) and a Postgres service. Both
+Applications use **Build Type = Nixpacks** and **Build Path = `/`** (the repo root must be the build context so
+`pnpm-workspace.yaml`, the lockfile and `packages/*` are present).
+
+## 0 · Postgres (Dokploy → Create service → Database → Postgres)
+
+Create a Postgres 16 service, then copy its internal connection string into the API app as `DATABASE_URL`
+(e.g. `postgres://pera:<password>@<service-name>:5432/pera`). Tables are created automatically at API boot.
 
 ## 1 · `pera-api` (port 3000)
 
@@ -10,8 +16,8 @@ must be the build context so `pnpm-workspace.yaml`, the lockfile and `packages/*
 | Provider | GitHub → this repo, branch `main` |
 | Build Type | Nixpacks |
 | Build Path | `/` |
-| Environment (build + run) | `NIXPACKS_CONFIG_FILE=nixpacks.api.toml`, `PORT=3000`, plus everything from `.env` (secrets, `SMART_ACCOUNT_ID`, `AGENT_RULE_ID`, `VAULT_ID`, `API_BEARER_TOKEN`, `PUBLIC_API_URL=https://<api-host>`, `RESOURCE_SERVER_URL=https://<rs-host>`, `EVENTS_FILE=/data/events.jsonl`) |
-| Advanced → Volumes | **Volume Mount**: name `events-data`, mount path `/data` (keeps the JSONL event log across redeploys) |
+| Environment (build + run) | `NIXPACKS_CONFIG_FILE=nixpacks.api.toml`, `PORT=3000`, `DATABASE_URL`, `WALLET_MASTER_KEY` (long random string), `SPONSOR_SECRET`, `EVM_SPONSOR_PRIVATE_KEY`, `API_BEARER_TOKEN`, `PUBLIC_API_URL=https://<api-host>`, `RESOURCE_SERVER_URL=https://<rs-host>`, `PASSKEY_RP_ID=<dashboard-domain>`, `PASSKEY_ORIGINS=https://<dashboard-domain>`, `VAULT_ID`, `DEFINDEX_API_KEY`, `X402_FACILITATOR_URL`, and for Privy: `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_GAS_SPONSORSHIP=on`. Optional `EVENTS_FILE=/data/events.jsonl` (JSONL fallback when no DB). |
+| Advanced → Volumes | **Volume Mount**: name `pera-data`, mount path `/data` (pending CCTP bridges + JSONL fallback) |
 | Domains | Host `<api-host>`, Container Port `3000`, HTTPS on, Certificate `letsencrypt` |
 
 ## 2 · `pera-resource-server` (port 4000)
@@ -24,6 +30,20 @@ must be the build context so `pnpm-workspace.yaml`, the lockfile and `packages/*
 
 Deploy the resource server first, then set `RESOURCE_SERVER_URL` on the API app and deploy it. Nixpacks builds are
 memory-hungry: deploy the two apps one at a time.
+
+## 3 · Dashboard / reference client (optional, Static)
+
+`apps/web` builds to static files: Application → Build Type **Static**, Build Path `/`, build command
+`pnpm install --frozen-lockfile && pnpm --filter @pera/web build`, publish directory `apps/web/dist`, env
+`VITE_API_URL=https://<api-host>`, `VITE_RESOURCE_SERVER_URL=https://<rs-host>`. Its domain must equal
+`PASSKEY_RP_ID` and appear in `PASSKEY_ORIGINS` on the API — passkeys are bound to the origin.
+
+## Privy setup (EVM gas sponsorship)
+
+Dashboard → App settings → Basics (App ID / App Secret) → Wallets → Advanced: enable **TEE execution** →
+**Fee sponsorship**: turn on *Sponsor gas fees*, add **Base Sepolia** under *Supported chains*, add billing.
+Without `PRIVY_APP_ID`/`PRIVY_APP_SECRET` the API falls back to local per-user EVM keys relayed by the sponsor EOA
+(which then needs Base Sepolia ETH).
 
 ## How the Nixpacks config works
 
