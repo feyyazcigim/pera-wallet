@@ -14,6 +14,19 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts"
   },
-  "dependencies": { "@pera/core": "workspace:*", "@x402/core": "2.26.0", "@x402/evm": "2.26.0", "@x402/express": "2.26.0", "@x402/paywall": "2.26.0", "@x402/stellar": "2.26.0", "express": "5.2.1", "tsx": "4.23.13" },
-  "devDependencies": { "@types/express": "^5.0.3", "typescript": "5.9.3" }
+  "dependencies": {
+    "@pera/core": "workspace:*",
+    "@x402/core": "2.26.0",
+    "@x402/evm": "2.26.0",
+    "@x402/express": "2.26.0",
+    "@x402/paywall": "2.26.0",
+    "@x402/stellar": "2.26.0",
+    "express": "5.2.1",
+    "tsx": "4.23.13",
+    "viem": "2.56.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "typescript": "5.9.3"
+  }
 }
