@@ -14,6 +14,16 @@ components:
       type: http
       scheme: bearer
   schemas:
+    RegisterOptionsBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required:
+        - displayName
+      additionalProperties: false
     RegisterBody:
       type: object
       properties:
@@ -25,36 +35,50 @@ components:
           type: string
           format: email
           pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
-        credentialId:
+        challenge:
           type: string
-          minLength: 8
-        publicKey:
-          type: string
-          minLength: 80
-        contractId:
-          type: string
-          pattern: ^C[A-Z2-7]{55}$
-        relayerPayload:
+          minLength: 16
+        registration:
           type: object
           properties:
-            func:
+            id:
               type: string
-            auth:
-              type: array
-              items:
-                type: string
+              minLength: 8
+            rawId:
+              type: string
+            type:
+              type: string
+            response:
+              type: object
+              properties:
+                clientDataJSON:
+                  type: string
+                attestationObject:
+                  type: string
+                authenticatorData:
+                  type: string
+                publicKey:
+                  type: string
+                publicKeyAlgorithm:
+                  type: number
+                transports:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - clientDataJSON
+              additionalProperties: false
           required:
-            - func
-            - auth
+            - id
+            - response
           additionalProperties: false
         dailyCapUsdc:
           type: string
           pattern: ^\d+(\.\d{1,7})?$
       required:
         - displayName
-        - credentialId
-        - publicKey
-        - contractId
+        - challenge
+        - registration
       additionalProperties: false
     LoginOptionsBody:
       type: object

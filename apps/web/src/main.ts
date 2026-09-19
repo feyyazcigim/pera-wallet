@@ -1,6 +1,6 @@
-import { startAuthentication } from "@simplewebauthn/browser";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { API_URL, RS_URL, api, setToken, token } from "./api";
-import { attach, bytesToB64u, getKit } from "./kit";
+import { attach } from "./kit";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const show = (id: string, v: unknown) => ($(id).textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2));
@@ -44,28 +44,21 @@ function startStream(): void {
   }
 }
 
-// 1. Register: the passkey ceremony + deploy payload come from the kit; the API submits it sponsored.
+// 1. Register: ONE passkey ceremony. The API deploys the smart account, installs the agent's capped rule
+//    through a temporary co-signer (removed right after), and provisions the sponsored accounts.
 $("register").onclick = async () => {
   try {
     const name = $<HTMLInputElement>("name").value || "Demo User";
     const email = $<HTMLInputElement>("email").value || undefined;
+    const opts = await api<Parameters<typeof startRegistration>[0]["optionsJSON"] & { challenge: string }>("/auth/register/options", { displayName: name });
     log("creating passkey…");
-    const kit = getKit();
-    const w = await kit.createWallet("Pera Agent Wallet", name, { autoSubmit: false });
-    log(`passkey ${w.credentialId} → smart account ${w.contractId}; registering…`);
-    const r = await api<{ token: string }>("/auth/register", {
-      displayName: name,
-      email,
-      credentialId: w.credentialId,
-      publicKey: bytesToB64u(w.publicKey),
-      contractId: w.contractId,
-      relayerPayload: w.relayerPayload,
-      dailyCapUsdc: $<HTMLInputElement>("cap").value || undefined,
-    });
+    const registration = await startRegistration({ optionsJSON: opts });
+    log(`passkey ${registration.id}; deploying smart account + agent rule (sponsored)…`);
+    const r = await api<{ token: string }>("/auth/register", { displayName: name, email, challenge: opts.challenge, registration, dailyCapUsdc: $<HTMLInputElement>("cap").value || undefined });
     setToken(r.token);
-    localStorage.setItem("pera.credentialId", w.credentialId);
+    localStorage.setItem("pera.credentialId", registration.id);
     await refreshMe();
-    log("registered ✔", "ok");
+    log("registered ✔ — agent already authorised, no further prompts for payments", "ok");
   } catch (err) {
     log(`register failed: ${(err as Error).message}`, "bad");
   }

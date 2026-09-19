@@ -15,7 +15,6 @@ import { Command } from "commander";
 import { api } from "./api";
 import { devicePasskey, loadDevice, saveDevice, saveSession } from "./device";
 import { attachDevice, browserLikeKit } from "./kit";
-import { expectedContractId } from "./derive";
 import { planTask } from "./planner";
 
 const program = new Command().name("pera-agent").description("Pera agent wallet CLI").version("0.2.0");
@@ -59,7 +58,7 @@ function fail(err: unknown): never {
 
 program
   .command("register")
-  .description("create a passkey-owned smart account and register with the API")
+  .description("one passkey ceremony: smart account + agent rule + sponsored accounts + EVM wallet")
   .requiredOption("--name <displayName>")
   .option("--email <email>")
   .option("--cap <usdc>", "daily cap for the agent")
@@ -71,35 +70,19 @@ program
         return;
       }
       const { passkey, record } = devicePasskey();
-      console.log(`▶ creating passkey-owned smart account (rpId ${passkey.rpId}, origin ${passkey.origin})`);
-      const kit = browserLikeKit(passkey);
-      let contractId = record.contractId;
-      let relayerPayload: { func: string; auth: string[] } | undefined;
-      let credentialId = record.credentialId;
-      let publicKey = record.publicKey;
-      try {
-        const w = await kit.createWallet("Pera Agent Wallet", o.name, { autoSubmit: false });
-        contractId = w.contractId;
-        credentialId = w.credentialId;
-        publicKey = Buffer.from(w.publicKey).toString("base64url");
-        relayerPayload = w.relayerPayload;
-        saveDevice({ ...record, credentialId, publicKey, contractId, displayName: o.name });
-      } catch (err) {
-        if (!/already exists|ExistingValue/.test((err as Error).message)) throw err;
-        contractId = expectedContractId(record.credentialId);
-        console.log(`  smart account already deployed; resuming registration for ${contractId}`);
-      }
-      console.log(`  contract ${contractId}\n  credential ${credentialId}`);
-      const r = await api({ token: "" }).post<{ token: string; expiresAt: string; user: { id: string }; wallets: unknown }>("/auth/register", {
+      const anon = api({ token: "" });
+      const opts = await anon.post<{ challenge: string }>("/auth/register/options", { displayName: o.name });
+      console.log(`▶ creating passkey (rpId ${passkey.rpId}, origin ${passkey.origin}) …`);
+      const registration = await passkey.startRegistration({ optionsJSON: opts });
+      console.log(`  credential ${passkey.credentialId}; API deploys smart account + agent rule (sponsored) …`);
+      const r = await anon.post<{ token: string; expiresAt: string; user: { id: string }; wallets: { stellar: { smartAccountId: string } } }>("/auth/register", {
         displayName: o.name,
         email: o.email,
-        credentialId,
-        publicKey,
-        contractId,
-        relayerPayload,
+        challenge: opts.challenge,
+        registration,
         dailyCapUsdc: o.cap,
       });
-      saveDevice({ ...record, credentialId, publicKey, contractId, displayName: o.name });
+      saveDevice({ ...record, contractId: r.wallets.stellar.smartAccountId, displayName: o.name });
       saveSession({ token: r.token, expiresAt: r.expiresAt, userId: r.user.id });
       console.log(`✔ registered user ${r.user.id}`);
       console.log(JSON.stringify(r.wallets, null, 2));
@@ -127,7 +110,7 @@ program
 
 program
   .command("authorize")
-  .description("owner approves the agent's capped rule with the passkey; submitted sponsored by the API")
+  .description("(re-)approve the agent rule with the passkey — normally done automatically at sign-up")
   .option("--cap <usdc>")
   .action(async (o: { cap?: string }) => {
     try {

@@ -103,10 +103,18 @@ export function selectSigners(kit: SmartAccountKit, signers: ContractSigner[], l
   return selected;
 }
 
-/** Owner = signers of the Default rule (id 0). Only usable when the owner is a local Ed25519 key (legacy demo). */
+/**
+ * Rule-0 signers this process can sign with (local Ed25519 keys). Passkey signers are skipped — under a
+ * `simple_threshold(1)` policy one local admin signature is enough; with no policy every signer must sign,
+ * so all of them must be local (legacy single-owner demo).
+ */
 export async function ownerSelected(kit: SmartAccountKit): Promise<SelectedSigner[]> {
   const { result } = await kit.rules.get(0);
-  return selectSigners(kit, result.signers, "owner rule 0");
+  // Only local Ed25519 keys can sign here; passkey entries would trigger a WebAuthn ceremony (browser only).
+  const selected = kit.multiSigners.buildSelectedSigners(result.signers).filter((s) => s.type === "ed25519");
+  if (selected.length === 0) throw new Error("no local admin signer for rule 0 (the owner is a passkey — sign in the browser)");
+  if (result.policies.length === 0 && selected.length !== result.signers.length) throw new Error("rule 0 has no threshold policy: every signer must sign, but not all keys are local");
+  return selected;
 }
 
 /** Unwraps a kit `TransactionResult` into a hash or throws a decoded error. */

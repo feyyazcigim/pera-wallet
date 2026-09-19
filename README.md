@@ -27,14 +27,17 @@ a *restricted signer* of a smart account, not a wallet owner.
 
 ## What the demo shows
 
-0. **Passkey sign-up** — the dashboard calls `smart-account-kit`'s `createWallet()` (Face ID / Touch ID), posts the
-   passkey + deploy payload to `POST /auth/register`; the API deploys the smart account with the sponsor key, verifies
-   the passkey owns rule 0, then creates the user's **treasury** and **agent** Stellar accounts with *sponsored reserves*
-   (0 XLM) and an **EVM wallet** (Privy server wallet with gas sponsorship, or a local key relayed by the sponsor).
-   Login is a standard WebAuthn assertion verified by the API (challenge + origin + rpId + P‑256 signature).
-1. **Agent approval** — the owner signs `add_context_rule` (agent signer + `spending_limit` policy) with the passkey in
-   the browser; the API re-simulates and submits it sponsored. Changing the cap is the same two-step flow
-   (`set_spending_limit` through the smart account's `execute`).
+0. **Passkey sign-up — one biometric prompt, nothing else ever again for payments.** The dashboard runs a
+   standard WebAuthn registration (`startRegistration`) and posts it to `POST /auth/register`. The API deploys the
+   smart account with the sponsor key, with rule 0 = *[passkey, temporary installer key]* under `simple_threshold(1)`;
+   the installer installs the agent's capped rule (`add_context_rule` with the agent signer + `spending_limit`),
+   then **removes itself**, so rule 0 ends up passkey-only — verified on-chain before the response. The API also
+   creates the user's **treasury** and **agent** Stellar accounts with *sponsored reserves* (0 XLM) and an **EVM
+   wallet** (Privy server wallet with gas sponsorship, or a local key relayed by the sponsor). Login is a standard
+   WebAuthn assertion verified by the API (challenge + origin + rpId + P‑256 signature); sessions last 7 days.
+1. **Cap changes only** need the passkey: the owner signs `set_spending_limit` (through the smart account's
+   `execute`) in the browser with `kit.signAdmin`; the API re-simulates and submits it sponsored. Re-approving the
+   agent (e.g. after revoking it) uses the same two-step flow (`/agent/authorize/build` → `/agent/authorize`).
 2. **On-ramp** — 200 TRY through `tr-mock-anchor` (SEP‑1/10/12/38/6). USDC lands on the user's treasury account.
 3. **Auto-yield** — the autopilot deposits everything above a reserve from each user's treasury into the shared
    DeFindex vault (per-user shares); withdrawals are instant and happen inline when the agent needs liquidity.
@@ -163,10 +166,9 @@ pnpm dev:api                   # API on :3000 — embedded PGlite unless DATABAS
 pnpm --filter @pera/web dev    # reference client on :5173 (real passkeys in the browser)
 
 # headless end-to-end with a software passkey (what the browser does, minus the biometric prompt):
-pnpm agent register --name "Ayşe"   # passkey → smart account (sponsored) → treasury/agent/EVM wallets
-pnpm agent login                     # WebAuthn assertion → session
-pnpm agent authorize --cap 10        # owner approves the agent rule (passkey-signed, sponsored submit)
-pnpm agent onramp 200                # TRY → USDC into the treasury
+pnpm agent register --name "Ayşe" --cap 10   # ONE passkey ceremony → smart account + agent rule + treasury/agent/EVM
+pnpm agent login                              # WebAuthn assertion → session (only when the session expired)
+pnpm agent onramp 200                         # TRY → USDC into the treasury
 pnpm agent pay http://localhost:4000/api/stellar/weather
 pnpm agent over-cap                  # exits 2 with policy error #3221
 pnpm agent set-cap 12                # passkey-signed set_spending_limit
@@ -184,7 +186,7 @@ Full schema in [openapi.yaml](openapi.yaml).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/auth/register` | passkey + `createWallet` payload → sponsored deploy, ownership check, provisioning, session |
+| POST | `/auth/register/options` → `/auth/register` | WebAuthn registration → sponsored deploy, agent rule via installer, ownership check, provisioning, session |
 | POST | `/auth/login/options` · `/auth/login/verify` | WebAuthn assertion challenge / verification → session |
 | GET | `/me` · `/balances` | user + wallets · treasury, float, smart account, vault, Base USDC |
 | POST | `/agent/authorize/build` → `/agent/authorize` | build `add_context_rule` → browser signs with passkey → sponsored submit |
@@ -206,9 +208,13 @@ Event types: `user.registered`, `wallet.provisioned`, `agent.authorized`, `onram
 ## Design decisions and trade-offs
 
 - **Vault-fronts-float** (above). Pure C-address x402 payment is a roadmap item, blocked by the linked issues.
-- **Passkey owns the smart account; the backend holds only restricted keys.** Admin operations (agent rule, cap)
-  are signed in the browser with `kit.signAdmin` and submitted by the API with the sponsor key
-  (`resimulateAndAssemble` + fee payer), because the public relayer proxy is origin-locked and passkey-only.
+- **Passkey owns the smart account; the backend holds only restricted keys.** Sign-up is a single ceremony
+  because a temporary installer co-signer (derived from the master key + credential id, never stored) installs the
+  agent rule under `simple_threshold(1)` and removes itself in the same flow; the API verifies the final rule 0
+  before answering. Later admin operations (cap changes) are signed in the browser with `kit.signAdmin` and
+  submitted by the API with the sponsor key (`resimulateAndAssemble` + fee payer), because the public relayer
+  proxy is origin-locked and passkey-only. Trade-off: for a few seconds during sign-up the backend is a co-owner;
+  the removal transaction is on-chain and auditable.
 - **Treasury G-account per user is the anchor receiver and DeFindex depositor.** SEP‑6 pays classic accounts and
   the hosted DeFindex API returns `operationXDR` for C-address callers; a custodial treasury keeps both flows to one
   signed XDR. All treasury/agent transactions are sponsor-sourced or fee-bumped, and the accounts are created with

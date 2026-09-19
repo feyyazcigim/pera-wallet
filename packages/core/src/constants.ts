@@ -34,6 +34,7 @@ export const SMART_ACCOUNT = {
   webauthnVerifier: "CC7EKIHQP3TN4CARQDND6CEOY2UXLWWC2X5GHTD5NLAT7BG5GPZIOM3F",
   ed25519Verifier: "CAAVTMCBXEIBPR64EAASKFXERVPYFZA2JYP5A3BG6PESWEFUJX5IHKN4",
   spendingLimitPolicy: "CABXBYJNZ7IUW4G3D6BND5YCAQF3ASSDMDAOKQQ63UYFSO7WUU2TIP5G",
+  thresholdPolicy: "CB3FATQKCIRIQOCYRUPCQ2KREQ7T4RPKS7EAEOZWPEPUKWEDRVROBCEG",
   /** ~5 s ledgers → 17 280 per day; the spending_limit period is expressed in ledgers. */
   ledgersPerDay: 17_280,
   /** spending_limit policy error codes (OpenZeppelin stellar-contracts). */

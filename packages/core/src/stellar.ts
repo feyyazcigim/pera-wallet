@@ -372,3 +372,10 @@ export function generateKeypair(): { publicKey: string; secret: string } {
   const kp = Keypair.random();
   return { publicKey: kp.publicKey(), secret: kp.secret() };
 }
+
+/** Deterministic Ed25519 keypair from a 32-byte seed (e.g. an HMAC of the master key). */
+export function keypairFromSeed(seed: Uint8Array): { publicKey: string; secret: string } {
+  if (seed.length !== 32) throw new Error("seed must be 32 bytes");
+  const kp = Keypair.fromRawEd25519Seed(Buffer.from(seed));
+  return { publicKey: kp.publicKey(), secret: kp.secret() };
+}

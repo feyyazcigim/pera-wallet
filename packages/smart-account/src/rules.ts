@@ -81,3 +81,14 @@ export async function removeRule(ctx: KitCtx, ruleId: number): Promise<{ txHash:
   log.info({ ruleId, hash }, "rule removed");
   return { txHash: hash };
 }
+
+/** Removes a temporary Ed25519 co-signer from rule 0 (signed by that same signer under the threshold policy). */
+export async function removeInstallerSigner(ctx: KitCtx, installerPublicKey: string): Promise<{ txHash: string }> {
+  const kit = await getKitFor(ctx);
+  const signer = createKitEd25519Signer(SMART_ACCOUNT.ed25519Verifier, Keypair.fromPublicKey(installerPublicKey).rawPublicKey());
+  const tx = await kit.signers.remove(0, signer);
+  const res = await kit.multiSigners.adminOperation(tx, await ownerSelected(kit), { resolveContextRuleIds: () => [0], forceMethod: "rpc" });
+  const { hash } = unwrapResult(res, "remove_signer(installer)");
+  log.info({ hash }, "installer signer removed; passkey is the sole owner");
+  return { txHash: hash };
+}

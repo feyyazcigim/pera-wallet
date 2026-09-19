@@ -3,17 +3,37 @@ import { loadEnv } from "@pera/core";
 import { consumeChallenge, createChallenge, createSession, deleteSession, getPasskey, getUser, touchPasskey } from "@pera/db";
 import { verifyAssertion } from "@pera/passkey";
 import { registerUser } from "../provisioning";
-import { LoginOptionsBody, LoginVerifyBody, RegisterBody } from "../schemas";
+import { LoginOptionsBody, LoginVerifyBody, RegisterBody, RegisterOptionsBody } from "../schemas";
+import { randomUUID } from "node:crypto";
 import { meView } from "./me";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  /** WebAuthn registration options: the browser runs `startRegistration({ optionsJSON })` (one biometric prompt). */
+  app.post("/auth/register/options", async (req) => {
+    const env = loadEnv();
+    const { displayName } = RegisterOptionsBody.parse(req.body);
+    const challenge = await createChallenge({ purpose: "register" });
+    return {
+      challenge,
+      rp: { id: env.PASSKEY_RP_ID, name: "Pera Agent Wallet" },
+      user: { id: Buffer.from(randomUUID()).toString("base64url"), name: displayName, displayName },
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+      authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+      attestation: "none",
+      timeout: 60_000,
+    };
+  });
+
   /**
-   * Browser flow: `kit.createWallet(app, name, { autoSubmit: false })` → post the passkey + deploy payload here.
-   * The server submits the deploy (sponsor pays), verifies the passkey owns rule 0, provisions the rest.
+   * One passkey ceremony for the whole sign-up: the API deploys the smart account (sponsor pays), installs
+   * the agent's capped rule through a temporary co-signer, removes it, provisions sponsored accounts + EVM wallet.
    */
   app.post("/auth/register", async (req, reply) => {
+    const env = loadEnv();
     const body = RegisterBody.parse(req.body);
-    const r = await registerUser(body);
+    const ch = await consumeChallenge(body.challenge, "register");
+    if (!ch) return reply.status(400).send({ error: "registration challenge expired or unknown", code: "BAD_CHALLENGE" });
+    const r = await registerUser(body, env.PASSKEY_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean));
     const session = await createSession(r.user.id);
     return reply.status(201).send({ token: session.token, expiresAt: session.expiresAt, ...(await meView(r.user)) });
   });

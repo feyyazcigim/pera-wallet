@@ -3,13 +3,24 @@ import { z } from "zod";
 const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/, "decimal USDC amount, up to 7 decimals");
 const DecimalTry = z.string().regex(/^\d+(\.\d{1,2})?$/, "decimal TRY amount, up to 2 decimals");
 
+export const RegisterOptionsBody = z.object({ displayName: z.string().min(1).max(64) });
 export const RegisterBody = z.object({
   displayName: z.string().min(1).max(64),
   email: z.string().email().optional(),
-  credentialId: z.string().min(8),
-  publicKey: z.string().min(80),
-  contractId: z.string().regex(/^C[A-Z2-7]{55}$/),
-  relayerPayload: z.object({ func: z.string(), auth: z.array(z.string()) }).optional(),
+  challenge: z.string().min(16),
+  registration: z.object({
+    id: z.string().min(8),
+    rawId: z.string().optional(),
+    type: z.string().optional(),
+    response: z.object({
+      clientDataJSON: z.string(),
+      attestationObject: z.string().optional(),
+      authenticatorData: z.string().optional(),
+      publicKey: z.string().optional(),
+      publicKeyAlgorithm: z.number().optional(),
+      transports: z.array(z.string()).optional(),
+    }),
+  }),
   dailyCapUsdc: DecimalUsdc.optional(),
 });
 export const LoginOptionsBody = z.object({ credentialId: z.string().optional() });
@@ -44,4 +55,4 @@ export const EventSchema = z.object({
 });
 export const ErrorSchema = z.object({ error: z.string(), code: z.string().optional(), errorCode: z.number().optional(), detail: z.unknown().optional() });
 
-export const bodySchemas = { RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, OfframpBody, AmountBody, PolicyBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
+export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, OfframpBody, AmountBody, PolicyBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
