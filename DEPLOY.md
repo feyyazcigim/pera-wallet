@@ -55,12 +55,19 @@ Keep the proxy read timeout ≥ 180 s on this host (`pay_url` on Base Sepolia br
 Verify: `curl https://api.<domain>/status` → `database: "postgres"`, `evm.configured: true`, `mcp.url`.
 
 ## 3 · Dashboard (static, landing + app)
-`apps/dashboard` builds to static files: Application → Build Type **Static**, Build Path `/`, build command
-`pnpm install --frozen-lockfile && pnpm --filter @pera/dashboard build`, publish directory `apps/dashboard/dist`,
-SPA fallback to `index.html` (routes under `/app`). Build-time env: `VITE_API_URL=https://api.<domain>`
-(and `VITE_RESOURCE_SERVER_URL=https://x402.<domain>` only with step 4). Domain: `<domain>`, HTTPS.
+`apps/dashboard` is a Vite SPA (landing at `/`, app at `/app`). Dokploy builds it with Nixpacks and then serves the
+output with nginx:
 
-Order: 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time.
+- Application → Provider: GitHub `pera-wallet`, branch `main`, **Build Path `/`**.
+- Build Type **Nixpacks**, **Publish Directory `apps/dashboard/dist`**, tick **Single Page Application (SPA)**
+  (the checkbox appears once a publish directory is set; it adds `try_files … /index.html`, needed for `/app` and
+  `/approvals/<id>` deep links).
+- Environment (build-time): `NIXPACKS_CONFIG_FILE=nixpacks.dashboard.toml` and `VITE_API_URL=https://api.<domain>`
+  (`VITE_RESOURCE_SERVER_URL=https://x402.<domain>` only with step 4). Vite inlines `VITE_*` at build time, so
+  changing them means a redeploy.
+- Domain: `<domain>`, container port 80, HTTPS.
+
+Order: 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time. 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time.
 
 ## 4 · Optional: demo paywalls (`pera-resource-server`, port 4000)
 Nixpacks, Build Path `/`, env `NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml`, `PORT=4000`, `SPONSOR_SECRET`,
