@@ -15,7 +15,7 @@ export function toContext(w: StellarWallet, evm: EvmWalletRef | undefined): ApiU
     agentPub: w.agentPublicKey,
     agentRuleId: w.agentRuleId ?? undefined,
     dailyCapUsdc: w.dailyCapUsdc,
-    evm: evm ? { provider: evm.provider, walletId: evm.walletId ?? undefined, address: evm.address } : undefined,
+    evm: evm ? { provider: evm.provider, walletId: evm.walletId, address: evm.address } : undefined,
     evmWallet: evm,
     status: w.status,
   };
@@ -25,6 +25,6 @@ export function toContext(w: StellarWallet, evm: EvmWalletRef | undefined): ApiU
 export async function loadContext(userId: string): Promise<ApiUserContext> {
   const [w, e] = await Promise.all([getStellarWallet(userId), getEvmWallet(userId)]);
   if (!w) throw Object.assign(new Error("wallet not provisioned for this user"), { statusCode: 409, code: "NOT_PROVISIONED" });
-  const evm = e ? { provider: e.provider, address: e.address, walletId: e.privyWalletId, secret: e.secret } : undefined;
+  const evm: EvmWalletRef | undefined = e ? { provider: "privy", address: e.address, walletId: e.privyWalletId, privyUserId: e.privyUserId } : undefined;
   return toContext(w, evm);
 }

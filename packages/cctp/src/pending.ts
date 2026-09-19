@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { BASE_SEPOLIA_CAIP2, childLogger, events, resolveEventsFile } from "@pera/core";
-import { getBaseUsdcBalance, type EvmWalletRef } from "@pera/evm";
+import { getBaseUsdcBalance, walletForAddress, type EvmWalletRef } from "@pera/evm";
 import { receiveOnBase } from "./evm";
 import { waitForAttestation } from "./iris";
 
@@ -57,13 +57,14 @@ export interface ResumeResult {
   error?: string;
 }
 
-/** Re-fetches the attestation for every pending burn and completes the mint with the given relayer wallet. */
-export async function resumePendingBridges(relayer: (p: PendingBridge) => Promise<EvmWalletRef>, onProgress?: (m: string) => void): Promise<ResumeResult[]> {
+/** Re-fetches the attestation for every pending burn and completes the mint from the recipient's Privy wallet. */
+export async function resumePendingBridges(onProgress?: (m: string) => void, relayer?: (p: PendingBridge) => Promise<EvmWalletRef | null>): Promise<ResumeResult[]> {
   const results: ResumeResult[] = [];
   for (const p of listPending()) {
     onProgress?.(`resuming burn ${p.burnTxHash} (${p.amountUsdc} USDC → ${p.recipient})`);
     try {
-      const wallet = await relayer(p);
+      const wallet = (await relayer?.(p)) ?? (await walletForAddress(p.recipient));
+      if (!wallet) throw new Error(`no Privy wallet known for recipient ${p.recipient}`);
       const att = await waitForAttestation(p.burnTxHash, { timeoutMs: 120_000, onPoll: (s) => onProgress?.(`iris: ${s}`) });
       const mint = await receiveOnBase({ message: att.message, attestation: att.attestation, wallet });
       const baseUsdcAfter = await getBaseUsdcBalance(p.recipient);

@@ -66,6 +66,8 @@ const STATEMENTS = [
      detail jsonb
    )`,
   `alter table evm_wallets add column if not exists secret_enc text`,
+  `alter table evm_wallets add column if not exists privy_user_id text`,
+  `create index if not exists evm_wallets_address on evm_wallets (lower(address))`,
   `create index if not exists events_user_ts on events (user_id, ts desc)`,
   `create index if not exists sessions_user on sessions (user_id)`,
 ];

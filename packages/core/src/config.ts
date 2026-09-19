@@ -7,7 +7,6 @@ import { z } from "zod";
 const StellarSecret = z.string().regex(/^S[A-Z2-7]{55}$/, "expected a Stellar secret key (S…)");
 const StellarAccount = z.string().regex(/^G[A-Z2-7]{55}$/, "expected a Stellar account id (G…)");
 const ContractId = z.string().regex(/^C[A-Z2-7]{55}$/, "expected a Soroban contract id (C…)");
-const EvmPrivateKey = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "expected a 0x-prefixed 32-byte hex key");
 const EvmAddress = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "expected a 0x-prefixed EVM address");
 const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/, "expected a decimal USDC amount");
 
@@ -20,7 +19,6 @@ export const EnvSchema = z.object({
   OWNER_SECRET: opt(StellarSecret),
   AGENT_SECRET: opt(StellarSecret),
   SPONSOR_SECRET: StellarSecret,
-  EVM_SPONSOR_PRIVATE_KEY: opt(EvmPrivateKey),
 
   DEFINDEX_API_KEY: opt(z.string().startsWith("sk_")),
   X402_FACILITATOR_URL: z.string().url().default("https://x402.org/facilitator"),
@@ -40,9 +38,9 @@ export const EnvSchema = z.object({
   WALLET_MASTER_KEY: z.string().min(16).default("dev-master-key-change-me-please"),
   PASSKEY_RP_ID: z.string().default("localhost"),
   PASSKEY_ORIGINS: z.string().default("http://localhost:5173,http://localhost:3000"),
-  PRIVY_APP_ID: opt(z.string()),
-  PRIVY_APP_SECRET: opt(z.string()),
-  PRIVY_AUTHORIZATION_PRIVATE_KEY: opt(z.string()),
+  /** Privy server wallets (required): every user gets an EVM wallet at sign-up; gas is sponsored by Privy. */
+  PRIVY_APP_ID: z.string().min(1, "PRIVY_APP_ID is required"),
+  PRIVY_APP_SECRET: z.string().min(1, "PRIVY_APP_SECRET is required"),
   PRIVY_GAS_SPONSORSHIP: z.enum(["on", "off"]).default("on"),
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
   RESOURCE_SERVER_URL: z.string().url().default("http://localhost:4000"),

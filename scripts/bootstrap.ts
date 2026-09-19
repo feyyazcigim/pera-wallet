@@ -9,7 +9,8 @@
  */
 import { cmpUsdc, derivedKeys, getBalances, loadEnv, reloadEnv, stellarAccountUrl, stellarContractUrl } from "@pera/core";
 import { autoDeposit, isConfigured, resolveOrCreateVault } from "@pera/yield";
-import { bridgeToBase, getBaseEthBalance, getBaseUsdcBalance, getEvmAddress } from "@pera/cctp";
+import { bridgeToBase, getBaseUsdcBalance } from "@pera/cctp";
+import { ensureAppWallet } from "@pera/evm";
 import { ensureFloat } from "@pera/x402-router";
 import { legacyContext } from "@pera/smart-account";
 import { appendDeployment, upsertEnv } from "./lib/deployments";
@@ -17,7 +18,7 @@ import { ensureAgentRule, ensureKeysFunded, ensureOwnerUsdc, ensureSmartAccount,
 
 let env = loadEnv();
 const keys = derivedKeys(env);
-console.log(`owner ${keys.ownerPub}\nagent ${keys.agentPub}\nsponsor ${keys.sponsorPub}\nevm ${getEvmAddress() ?? "(none)"}`);
+console.log(`owner ${keys.ownerPub}\nagent ${keys.agentPub}\nsponsor ${keys.sponsorPub}`);
 
 say("1/8 fund Stellar keys (friendbot)");
 await ensureKeysFunded(env);
@@ -55,22 +56,17 @@ const auto = await autoDeposit(legacyContext());
 console.log(auto.deposited ? `  deposited ${auto.deposited} USDC (${auto.txHash})` : `  skipped: ${auto.skipped}`);
 if (auto.deposited && auto.txHash) appendDeployment({ kind: "tx", label: `autopilot deposit ${auto.deposited} USDC`, id: env.VAULT_ID, txHash: auto.txHash, network: "stellar:testnet", url: `https://stellar.expert/explorer/testnet/tx/${auto.txHash}` });
 
-say("8/8 pre-bridge 2 USDC to Base Sepolia via CCTP");
-const evm = getEvmAddress();
-if (!evm) console.log("  skipped: no EVM_SPONSOR_PRIVATE_KEY");
-else {
-  const eth = await getBaseEthBalance();
-  const usdc = await getBaseUsdcBalance();
-  if (Number(eth) === 0) console.log(`  skipped: ${evm} has no Base Sepolia ETH for gas (fund it and re-run)`);
-  else if (cmpUsdc(usdc, "1") >= 0) console.log(`  skipped: Base already holds ${usdc} USDC`);
+say("8/8 pre-bridge 2 USDC to Base Sepolia via CCTP (legacy demo Privy wallet)");
+{
+  const evmWallet = await ensureAppWallet("legacy-demo");
+  const usdc = await getBaseUsdcBalance(evmWallet.address);
+  if (cmpUsdc(usdc, "1") >= 0) console.log(`  skipped: ${evmWallet.address} already holds ${usdc} USDC`);
   else {
     const lc = legacyContext();
     await ensureFloat(lc, { neededUsdc: "2" });
-    const { privateKeyToAccount } = await import("viem/accounts");
-    const evmWallet = { provider: "local" as const, address: privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`).address, secret: env.EVM_SPONSOR_PRIVATE_KEY };
     const b = await bridgeToBase({ userId: lc.userId, agentSecret: lc.agentSecret, agentPub: lc.agentPub, evmWallet }, { amountUsdc: "2", onProgress: (m) => console.log(`    ${m}`) });
     appendDeployment({ kind: "tx", label: `CCTP burn ${b.amountUsdc} USDC (Stellar → Base Sepolia)`, id: keys.agentPub, txHash: b.burnTxHash, network: "stellar:testnet", url: b.burnExplorerUrl });
-    appendDeployment({ kind: "tx", label: `CCTP mint ${b.amountUsdc} USDC on Base Sepolia`, id: evm, txHash: b.mintTxHash, network: "eip155:84532", url: b.mintExplorerUrl });
+    appendDeployment({ kind: "tx", label: `CCTP mint ${b.amountUsdc} USDC on Base Sepolia (Privy sponsored)`, id: evmWallet.address, txHash: b.mintTxHash, network: "eip155:84532", url: b.mintExplorerUrl });
     console.log(`  bridged ${b.amountUsdc} USDC → Base balance ${b.baseUsdcAfter}`);
   }
 }

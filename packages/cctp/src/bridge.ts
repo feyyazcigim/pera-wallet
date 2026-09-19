@@ -1,5 +1,5 @@
 import { BASE_SEPOLIA_CAIP2, childLogger, events, loadEnv, STELLAR_CAIP2, type UserWalletContext } from "@pera/core";
-import { getBaseEthBalance, getBaseUsdcBalance, sponsorAddress, type EvmWalletRef } from "@pera/evm";
+import { getBaseUsdcBalance, type EvmWalletRef } from "@pera/evm";
 import { receiveOnBase } from "./evm";
 import { waitForAttestation } from "./iris";
 import { savePending } from "./pending";
@@ -31,13 +31,6 @@ export async function bridgeToBase(ctx: BridgeCtx, p: { amountUsdc: string; onPr
     log.info({ userId: ctx.userId }, m);
     p.onProgress?.(m);
   };
-
-  // Never burn what we cannot mint: local wallets rely on the sponsor EOA's gas.
-  if (ctx.evmWallet.provider === "local") {
-    const s = sponsorAddress();
-    const eth = s ? await getBaseEthBalance(s) : "0";
-    if (Number(eth) <= 0) throw new Error(`EVM sponsor ${s} has no Base Sepolia ETH to relay receiveMessage; refusing to burn USDC on Stellar.`);
-  }
 
   say(`burning ${p.amountUsdc} USDC on Stellar for ${recipient}`);
   const burn = await approveAndBurn({ callerSecret: ctx.agentSecret, sponsorSecret: env.SPONSOR_SECRET, amountUsdc: p.amountUsdc, evmRecipient: recipient });

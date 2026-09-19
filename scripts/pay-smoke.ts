@@ -5,7 +5,8 @@
  */
 import { getBalances, derivedKeys, loadEnv, stellarContractUrl } from "@pera/core";
 import { payFor } from "@pera/x402-router";
-import { getBaseEthBalance, getBaseUsdcBalance } from "@pera/cctp";
+import { getBaseUsdcBalance } from "@pera/cctp";
+import { ensureAppWallet } from "@pera/evm";
 import { legacyContext } from "@pera/smart-account";
 import { appendDeployment } from "./lib/deployments";
 import { say } from "./lib/steps";
@@ -14,7 +15,7 @@ const env = loadEnv();
 const rs = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
 const stellarOnly = process.argv.includes("--stellar-only");
 const { agentPub } = derivedKeys(env);
-const evmWallet = env.EVM_SPONSOR_PRIVATE_KEY ? { provider: "local" as const, address: (await import("viem/accounts")).privateKeyToAccount(env.EVM_SPONSOR_PRIVATE_KEY as `0x${string}`).address, secret: env.EVM_SPONSOR_PRIVATE_KEY } : undefined;
+const evmWallet = await ensureAppWallet("legacy-demo");
 const ctx = { ...legacyContext(), evmWallet };
 
 const health = await fetch(`${rs}/health`).then((r) => r.json() as Promise<{ routes: string[]; payToStellar: string; payToEvm?: string }>);
@@ -33,16 +34,13 @@ const c = await payFor(ctx, `${rs}/api/any/quote`);
 console.log(`  offers ${JSON.stringify(c.offers)} → paid on ${c.network} tx ${c.txHash}\n  ${c.explorerUrl}\n  body: ${JSON.stringify(c.body)}`);
 appendDeployment({ kind: "tx", label: `x402 payment ${c.amountUsdc} USDC (dual-offer route, Stellar chosen)`, id: agentPub, txHash: c.txHash, network: "stellar:testnet", url: c.explorerUrl });
 
-if (stellarOnly || !env.EVM_SPONSOR_PRIVATE_KEY || !health.payToEvm) {
+if (stellarOnly || !health.payToEvm) {
   console.log("\n(skipping Base Sepolia leg)");
 } else {
   say("3/3 pay the Base Sepolia paywall (CCTP bridge if the Base balance is short)");
-  const eth = await getBaseEthBalance();
-  const usdc = await getBaseUsdcBalance();
-  console.log(`  EVM sponsor: ${eth} ETH, ${usdc} USDC`);
-  if (Number(eth) === 0) {
-    console.log("  EVM sponsor has no Base Sepolia ETH — cannot pay gas for receiveMessage; skipping.");
-  } else {
+  const usdc = await getBaseUsdcBalance(evmWallet.address);
+  console.log(`  legacy demo Privy wallet ${evmWallet.address}: ${usdc} USDC (gas sponsored by Privy)`);
+  {
     const b = await payFor(ctx, `${rs}/api/base/summary`);
     console.log(`  paid ${b.amountUsdc} USDC on ${b.network} → tx ${b.txHash}\n  ${b.explorerUrl}`);
     if (b.bridged) console.log(`  bridged ${b.bridged.amountUsdc} USDC: burn ${b.bridged.burnTxHash} → mint ${b.bridged.mintTxHash}`);

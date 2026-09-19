@@ -32,9 +32,11 @@ a *restricted signer* of a smart account, not a wallet owner.
    smart account with the sponsor key, with rule 0 = *[passkey, temporary installer key]* under `simple_threshold(1)`;
    the installer installs the agent's capped rule (`add_context_rule` with the agent signer + `spending_limit`),
    then **removes itself**, so rule 0 ends up passkey-only — verified on-chain before the response. The API also
-   creates the user's **treasury** and **agent** Stellar accounts with *sponsored reserves* (0 XLM) and an **EVM
-   wallet** (Privy server wallet with gas sponsorship, or a local key relayed by the sponsor). Login is a standard
-   WebAuthn assertion verified by the API (challenge + origin + rpId + P‑256 signature); sessions last 7 days.
+   creates the user's **treasury** and **agent** Stellar accounts with *sponsored reserves* (0 XLM) and a **Privy
+   EVM wallet**: a Privy user is created for the same identity (`custom_auth` = our user id, plus the email) and an
+   app-controlled server wallet is attributed to it, so the agent can sign autonomously while Privy sponsors gas.
+   Login is a standard WebAuthn assertion verified by the API (challenge + origin + rpId + P‑256 signature);
+   sessions last 7 days.
 1. **Cap changes only** need the passkey: the owner signs `set_spending_limit` (through the smart account's
    `execute`) in the browser with `kit.signAdmin`; the API re-simulates and submits it sponsored. Re-approving the
    agent (e.g. after revoking it) uses the same two-step flow (`/agent/authorize/build` → `/agent/authorize`).
@@ -47,8 +49,9 @@ a *restricted signer* of a smart account, not a wallet owner.
 5. **x402 on Stellar** — the agent hits a paywalled weather API, gets a 402, pays 0.01 USDC natively from its float,
    receives live Istanbul weather. The facilitator sponsors the network fee, so the float holds USDC only.
 6. **x402 on Base Sepolia** — the agent hits an `eip155:84532` paywall, burns USDC on Stellar through **Circle
-   CCTP V2**, waits for the Iris attestation, mints to the user's EVM wallet (`receiveMessage` gas sponsored) and
-   pays with the EVM exact scheme (EIP‑3009, gasless).
+   CCTP V2**, waits for the Iris attestation, mints to the user's Privy wallet (`receiveMessage` sent by that wallet
+   with Privy gas sponsorship) and pays with the EVM exact scheme (EIP‑3009, gasless; ERC‑1271 mode once the wallet
+   is 7702-delegated).
 7. **Off-ramp** — USDC back to TRY through the same anchor (SEP‑6 withdraw with an id memo; sponsor pays the fee).
 
 ## Architecture
@@ -79,8 +82,9 @@ flowchart TB
 **Key custody.** The smart account owner is the user's passkey — it never leaves the device. The backend keeps two
 custodial Ed25519 keys per user (treasury, agent), AES‑256‑GCM encrypted in Postgres under `WALLET_MASTER_KEY`; the
 agent key is worthless beyond the on-chain cap, and the treasury key can only ever move funds *into* the smart
-account, the vault or the anchor off-ramp. EVM keys live in Privy's TEE (or, without Privy credentials, encrypted
-locally). Roadmap: move the custodial Stellar keys into Privy raw-sign wallets too.
+account, the vault or the anchor off-ramp. EVM keys never exist outside Privy's TEE. Roadmap: move the custodial
+Stellar keys into Privy raw-sign wallets too, and make the Privy wallet user-owned with the backend as a session
+signer (Privy authorization key) instead of app-owned.
 
 **Design decision: vault-fronts-float.** `@x402/stellar` cannot use a C-address as the payer today — the client
 forces an Ed25519 signature shape, the reference facilitator rejects policy events during simulation, and its fee
@@ -102,7 +106,7 @@ on-chain: the cap is enforced inside the smart account's `__check_auth`, not by 
 | **Circle CCTP V2** (Stellar domain 27 → Base Sepolia domain 6) | `packages/cctp` | `deposit_for_burn` on `CDNG7HX…RTHP`, Iris sandbox attestation, `MessageTransmitterV2.receiveMessage` via viem |
 | **x402 v2** (`@x402/core|stellar|evm|express` 2.26.0) | `packages/x402-router`, `apps/resource-server` | facilitator `https://x402.org/facilitator` (Stellar fees sponsored, also serves `eip155:84532`); OpenZeppelin facilitator optional via `OZ_FACILITATOR_API_KEY` |
 | **Passkeys / WebAuthn** (`smart-account-kit` in the browser + own verifier) | `packages/passkey`, `apps/web`, `apps/agent` | assertion verified with WebCrypto against the on-chain owner key; software passkey for headless tests |
-| **Privy server wallets + gas sponsorship** (`@privy-io/node` 0.34) | `packages/evm` | `sponsor: true` (EIP‑7702 + paymaster) on Base Sepolia; ERC‑1271 typed-data mode for x402; falls back to local keys + sponsor EOA relay without credentials |
+| **Privy server wallets + gas sponsorship** (`@privy-io/node` 0.34) | `packages/evm` | Privy user + wallet per sign-up; `sponsor: true` (EIP‑7702 + paymaster) on Base Sepolia; ERC‑1271 typed-data mode for x402; the demo merchant is an app-owned Privy wallet too |
 | **Sponsored reserves on Stellar** | `packages/core` | `beginSponsoringFutureReserves` + `createAccount(0)` + trustline: user accounts hold no XLM |
 
 ## Skills used
@@ -144,7 +148,7 @@ packages/passkey         WebAuthn assertion verification (WebCrypto) + software 
 packages/anchor          SEP-1/10/12/38/6 client — on-ramp, off-ramp, quotes
 packages/smart-account   per-user kit, deploy via bindings, sponsored submit of passkey-signed txs, agent rule, capped top-up, policy
 packages/yield           DeFindex vault create/resolve, per-user deposit/withdraw/position, autopilot + ensureLiquidity
-packages/evm             EVM wallet providers: Privy (gas sponsorship) | local (sponsor relay), USDC transfers, x402 signer
+packages/evm             Privy server wallets: user + wallet at sign-up, sponsored calls, USDC transfers, x402 signer
 packages/cctp            approve + deposit_for_burn, Iris polling, receiveMessage on Base, bridgeToBase, pending resume
 packages/x402-router     payFor(ctx, url): probe → parse 402 → ensureFloat cascade → pay (Stellar native | CCTP + EVM)
 apps/api                 Fastify REST API: passkey auth, provisioning, per-user routes, SSE (see openapi.yaml)
@@ -158,8 +162,8 @@ scripts/                 keys, bootstrap (global infra + legacy single-user demo
 
 ```bash
 corepack enable && pnpm install
-pnpm keys                      # .env with the sponsor keys (+ legacy demo keys), prints addresses
-# optional: DEFINDEX_API_KEY (console.defindex.io), Base Sepolia ETH for the EVM sponsor, PRIVY_APP_ID/SECRET, DATABASE_URL
+pnpm keys                      # .env with the sponsor key (+ legacy demo keys), prints addresses
+# required: PRIVY_APP_ID / PRIVY_APP_SECRET (+ dashboard: TEE, Fee sponsorship on Base Sepolia); optional: DEFINDEX_API_KEY, DATABASE_URL
 pnpm bootstrap                 # sponsor funding, vault, legacy single-user demo (optional)
 pnpm dev:rs                    # paywalls on :4000
 pnpm dev:api                   # API on :3000 — embedded PGlite unless DATABASE_URL is set
@@ -219,9 +223,9 @@ Event types: `user.registered`, `wallet.provisioned`, `agent.authorized`, `onram
   the hosted DeFindex API returns `operationXDR` for C-address callers; a custodial treasury keeps both flows to one
   signed XDR. All treasury/agent transactions are sponsor-sourced or fee-bumped, and the accounts are created with
   sponsored reserves, so users hold no XLM at all.
-- **EVM gas sponsorship through Privy** (`sponsor: true`, EIP‑7702 + paymaster; needs TEE + Fee sponsorship +
-  Base Sepolia enabled in the Privy dashboard). Without Privy credentials the same provider interface uses per-user
-  local keys with the sponsor EOA relaying permissionless calls and EIP‑3009 transfers — still gasless for the user.
+- **EVM gas sponsorship through Privy only** (`sponsor: true`, EIP‑7702 + paymaster; needs TEE + Fee sponsorship +
+  Base Sepolia enabled in the Privy dashboard). There is no non-Privy EVM path: no backend EOA holds ETH, and the
+  API refuses to start without `PRIVY_APP_ID` / `PRIVY_APP_SECRET`.
 - **Postgres for users, passkeys, sessions, wallets and events** (PGlite embedded in dev). Custodial secrets are
   AES‑256‑GCM encrypted under `WALLET_MASTER_KEY`.
 - **No recipient allowlist.** OpenZeppelin's policies are `simple_threshold`, `weighted_threshold` and

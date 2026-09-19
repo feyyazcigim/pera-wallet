@@ -30,7 +30,7 @@ export async function meView(user: User) {
             deployTxHash: w.deployTxHash,
           }
         : null,
-      evm: e ? { provider: e.provider, address: e.address, explorerUrl: baseAddressUrl(e.address), network: "eip155:84532" } : null,
+      evm: e ? { provider: "privy", walletId: e.privyWalletId, privyUserId: e.privyUserId, address: e.address, explorerUrl: baseAddressUrl(e.address), network: "eip155:84532" } : null,
     },
   };
 }

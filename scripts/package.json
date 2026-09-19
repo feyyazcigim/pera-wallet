@@ -20,6 +20,7 @@
     "@pera/api": "workspace:*",
     "@pera/cctp": "workspace:*",
     "@pera/core": "workspace:*",
+    "@pera/evm": "workspace:*",
     "@pera/smart-account": "workspace:*",
     "@pera/x402-router": "workspace:*",
     "@pera/yield": "workspace:*",

@@ -1,5 +1,5 @@
 import type { Hex } from "viem";
-import { signTypedDataFor } from "./wallets";
+import { signTypedDataFor } from "./privy";
 import type { EvmWalletRef, TypedDataInput } from "./provider";
 
 /**

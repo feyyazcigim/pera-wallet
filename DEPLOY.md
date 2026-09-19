@@ -16,7 +16,7 @@ Create a Postgres 16 service, then copy its internal connection string into the 
 | Provider | GitHub → this repo, branch `main` |
 | Build Type | Nixpacks |
 | Build Path | `/` |
-| Environment (build + run) | `NIXPACKS_CONFIG_FILE=nixpacks.api.toml`, `PORT=3000`, `DATABASE_URL`, `WALLET_MASTER_KEY` (long random string), `SPONSOR_SECRET`, `EVM_SPONSOR_PRIVATE_KEY`, `API_BEARER_TOKEN`, `PUBLIC_API_URL=https://<api-host>`, `RESOURCE_SERVER_URL=https://<rs-host>`, `PASSKEY_RP_ID=<dashboard-domain>`, `PASSKEY_ORIGINS=https://<dashboard-domain>`, `VAULT_ID`, `DEFINDEX_API_KEY`, `X402_FACILITATOR_URL`, and for Privy: `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_GAS_SPONSORSHIP=on`. Optional `EVENTS_FILE=/data/events.jsonl` (JSONL fallback when no DB). |
+| Environment (build + run) | `NIXPACKS_CONFIG_FILE=nixpacks.api.toml`, `PORT=3000`, `DATABASE_URL`, `WALLET_MASTER_KEY` (long random string), `SPONSOR_SECRET`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `PRIVY_GAS_SPONSORSHIP=on`, `API_BEARER_TOKEN`, `PUBLIC_API_URL=https://<api-host>`, `RESOURCE_SERVER_URL=https://<rs-host>`, `PASSKEY_RP_ID=<dashboard-domain>`, `PASSKEY_ORIGINS=https://<dashboard-domain>`, `VAULT_ID`, `DEFINDEX_API_KEY`, `X402_FACILITATOR_URL`. |
 | Advanced → Volumes | **Volume Mount**: name `pera-data`, mount path `/data` (pending CCTP bridges + JSONL fallback) |
 | Domains | Host `<api-host>`, Container Port `3000`, HTTPS on, Certificate `letsencrypt` |
 
@@ -25,7 +25,7 @@ Create a Postgres 16 service, then copy its internal connection string into the 
 | Setting | Value |
 |---|---|
 | Build Type / Path | Nixpacks / `/` |
-| Environment | `NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml`, `PORT=4000`, `OWNER_SECRET`, `AGENT_SECRET`, `SPONSOR_SECRET` (only public keys are derived), `EVM_SPONSOR_PRIVATE_KEY`, `X402_FACILITATOR_URL=https://x402.org/facilitator`, optional `MERCHANT_STELLAR_ADDRESS`, `MERCHANT_EVM_ADDRESS`, `OZ_FACILITATOR_API_KEY` |
+| Environment | `NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml`, `PORT=4000`, `SPONSOR_SECRET`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET` (creates the app-owned merchant wallet), `X402_FACILITATOR_URL=https://x402.org/facilitator`, optional `MERCHANT_STELLAR_ADDRESS` (default: owner demo key), `MERCHANT_EVM_ADDRESS`, `OZ_FACILITATOR_API_KEY` |
 | Domains | Host `<rs-host>`, Container Port `4000`, HTTPS on, `letsencrypt` |
 
 Deploy the resource server first, then set `RESOURCE_SERVER_URL` on the API app and deploy it. Nixpacks builds are
@@ -42,8 +42,8 @@ memory-hungry: deploy the two apps one at a time.
 
 Dashboard → App settings → Basics (App ID / App Secret) → Wallets → Advanced: enable **TEE execution** →
 **Fee sponsorship**: turn on *Sponsor gas fees*, add **Base Sepolia** under *Supported chains*, add billing.
-Without `PRIVY_APP_ID`/`PRIVY_APP_SECRET` the API falls back to local per-user EVM keys relayed by the sponsor EOA
-(which then needs Base Sepolia ETH).
+Privy is required: the API does not start without `PRIVY_APP_ID` / `PRIVY_APP_SECRET`, and every sign-up creates a
+Privy user (`custom_auth` = Pera user id) plus an app-controlled wallet attributed to it.
 
 ## How the Nixpacks config works
 

@@ -174,27 +174,26 @@ export async function updateStellarWallet(userId: string, patch: Partial<Pick<St
 // ---------------------------------------------------------------------------- evm wallets
 export interface EvmWallet {
   userId: string;
-  provider: "privy" | "local";
-  privyWalletId: string | null;
+  provider: "privy";
+  privyWalletId: string;
+  privyUserId: string | null;
   address: string;
-  /** Only for the `local` provider (encrypted at rest). */
-  secret: string | null;
 }
 
 const rowToEvm = (r: Record<string, unknown>): EvmWallet => ({
   userId: String(r.user_id),
-  provider: String(r.provider) as "privy" | "local",
-  privyWalletId: (r.privy_wallet_id as string | null) ?? null,
+  provider: "privy",
+  privyWalletId: String(r.privy_wallet_id),
+  privyUserId: (r.privy_user_id as string | null) ?? null,
   address: String(r.address),
-  secret: r.secret_enc ? decryptSecret(String(r.secret_enc)) : null,
 });
 
-export async function upsertEvmWallet(p: { userId: string; provider: "privy" | "local"; privyWalletId?: string; address: string; secret?: string }): Promise<EvmWallet> {
+export async function upsertEvmWallet(p: { userId: string; privyWalletId: string; privyUserId?: string; address: string }): Promise<EvmWallet> {
   const db = await getDb();
   const rows = await db.query(
-    `insert into evm_wallets (user_id, provider, privy_wallet_id, address, secret_enc) values ($1, $2, $3, $4, $5)
-     on conflict (user_id) do update set provider = excluded.provider, privy_wallet_id = excluded.privy_wallet_id, address = excluded.address, secret_enc = excluded.secret_enc returning *`,
-    [p.userId, p.provider, p.privyWalletId ?? null, p.address, p.secret ? encryptSecret(p.secret) : null],
+    `insert into evm_wallets (user_id, provider, privy_wallet_id, privy_user_id, address) values ($1, 'privy', $2, $3, $4)
+     on conflict (user_id) do update set privy_wallet_id = excluded.privy_wallet_id, privy_user_id = excluded.privy_user_id, address = excluded.address returning *`,
+    [p.userId, p.privyWalletId, p.privyUserId ?? null, p.address],
   );
   return rowToEvm(rows[0]!);
 }
@@ -202,6 +201,12 @@ export async function upsertEvmWallet(p: { userId: string; provider: "privy" | "
 export async function getEvmWallet(userId: string): Promise<EvmWallet | null> {
   const db = await getDb();
   const rows = await db.query("select * from evm_wallets where user_id = $1", [userId]);
+  return rows[0] ? rowToEvm(rows[0]) : null;
+}
+
+export async function getEvmWalletByAddress(address: string): Promise<EvmWallet | null> {
+  const db = await getDb();
+  const rows = await db.query("select * from evm_wallets where lower(address) = lower($1)", [address]);
   return rows[0] ? rowToEvm(rows[0]) : null;
 }
 
