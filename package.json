@@ -18,6 +18,7 @@
     "start:rs": "pnpm --filter @pera/resource-server start",
     "agent": "pnpm --filter @pera/agent start",
     "keys": "pnpm --filter @pera/scripts keys",
+    "bank": "pnpm --filter @pera/scripts bank",
     "bootstrap": "pnpm --filter @pera/scripts bootstrap",
     "smoke:onramp": "pnpm --filter @pera/scripts smoke:onramp",
     "smoke:policy": "pnpm --filter @pera/scripts smoke:policy",

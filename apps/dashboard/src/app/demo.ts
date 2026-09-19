@@ -218,6 +218,9 @@ export const demoBackend: Backend = {
     emit("float.topup.rejected", attempt, { code: "#3221", reason: "SpendingLimitExceeded" });
     return `Rejected on-chain: Error(Contract, #3221) SpendingLimitExceeded — tried $${attempt.toFixed(2)} with $${(attempt - 1).toFixed(2)} left under the cap.`;
   },
+  async depositDetails() {
+    return { iban: "TR00 0000 0000 0000 0000 0000 00", bankName: "Demo Bank", reference: "DEMO-0000", minTry: 50, maxTry: 3000 };
+  },
   async cliToken() {
     return "ps_demo-token-not-real";
   },

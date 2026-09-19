@@ -310,3 +310,59 @@ export async function listPaidAmountsSince(userId: string, sinceIso: string): Pr
   const rows = await db.query("select amount_usdc from events where user_id = $1 and type = 'x402.paid' and ts >= $2 and amount_usdc is not null", [userId, new Date(sinceIso)]);
   return rows.map((r) => String(r.amount_usdc));
 }
+
+// ---- deposit orders: the bank details shown to a user (IBAN + reference) → the anchor's SEP-6 order ----
+
+export interface DepositOrder {
+  reference: string;
+  userId: string;
+  anchorTxId: string;
+  iban: string;
+  bankName: string | null;
+  status: "open" | "funded";
+  createdAt: string;
+}
+const toOrder = (r: Record<string, unknown>): DepositOrder => ({
+  reference: String(r.reference),
+  userId: String(r.user_id),
+  anchorTxId: String(r.anchor_tx_id),
+  iban: String(r.iban),
+  bankName: (r.bank_name as string | null) ?? null,
+  status: r.status === "funded" ? "funded" : "open",
+  createdAt: new Date(r.created_at as string).toISOString(),
+});
+
+export async function createDepositOrder(p: { reference: string; userId: string; anchorTxId: string; iban: string; bankName?: string }): Promise<DepositOrder> {
+  const db = await getDb();
+  await db.query("insert into deposit_orders (reference, user_id, anchor_tx_id, iban, bank_name) values ($1, $2, $3, $4, $5) on conflict (reference) do nothing", [p.reference, p.userId, p.anchorTxId, p.iban, p.bankName ?? null]);
+  return (await getDepositOrder(p.reference))!;
+}
+
+/** The user's newest order that has not been paid into yet (orders older than `maxAgeMs` are left to expire). */
+export async function getOpenDepositOrder(userId: string, maxAgeMs = 12 * 3600_000): Promise<DepositOrder | null> {
+  const db = await getDb();
+  const rows = await db.query("select * from deposit_orders where user_id = $1 and status = 'open' and created_at >= $2 order by created_at desc limit 1", [userId, new Date(Date.now() - maxAgeMs)]);
+  return rows[0] ? toOrder(rows[0]) : null;
+}
+
+export async function getDepositOrder(reference: string): Promise<DepositOrder | null> {
+  const db = await getDb();
+  const rows = await db.query("select * from deposit_orders where upper(reference) = upper($1)", [reference.trim()]);
+  return rows[0] ? toOrder(rows[0]) : null;
+}
+
+export async function markDepositOrderFunded(reference: string): Promise<void> {
+  const db = await getDb();
+  await db.query("update deposit_orders set status = 'funded' where reference = $1", [reference]);
+}
+
+/** Paid-into orders whose payout was never announced (the API restarted, or the anchor was slow) — to resume tracking. */
+export async function listUnsettledDepositOrders(maxAgeMs = 6 * 3600_000): Promise<DepositOrder[]> {
+  const db = await getDb();
+  const rows = await db.query(
+    `select o.* from deposit_orders o where o.status = 'funded' and o.created_at >= $1
+       and not exists (select 1 from events e where e.type = 'onramp.completed' and e.detail->>'anchorTxId' = o.anchor_tx_id)`,
+    [new Date(Date.now() - maxAgeMs)],
+  );
+  return rows.map(toOrder);
+}

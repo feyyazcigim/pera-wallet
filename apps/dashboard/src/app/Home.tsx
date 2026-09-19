@@ -4,7 +4,7 @@ import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { FlowScene, type FlowSceneHandle, type FlowStep } from "../FlowScene";
 import { CountUp, Hl, Line, Rise } from "../ui";
-import { api, CapExceededError, NETWORKS, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
+import { api, CapExceededError, NETWORKS, type DepositDetails as DepositDetailsT, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
 import { describe, pendingOf, shortUrl, timeAgo, usd, useApp, type EventKind } from "./store";
 
 const FILTERS: Record<string, "all" | EventKind> = { All: "all", Deposits: "deposit", Vault: "yield", Agent: "agent", Bridge: "bridge" };
@@ -66,7 +66,7 @@ export function Home() {
             </div>
           </dl>
         </Rise>
-        <CliConnect open={idle} />
+        <DepositDetails open={idle} />
       </section>
 
       <LiveFlow />
@@ -81,76 +81,86 @@ export function Home() {
   );
 }
 
-/** Deposits are made from the terminal. This mints a CLI session for this account and shows the two commands. */
-function CliConnect({ open }: { open: boolean }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+/** How lira gets in: a bank transfer to the anchor's IBAN with this user's reference in the description. */
+function DepositDetails({ open }: { open: boolean }) {
+  const { events } = useApp();
   const [shown, setShown] = useState(open);
+  const [details, setDetails] = useState<DepositDetailsT | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   useEffect(() => {
     if (open) setShown(true);
   }, [open]);
-  const commands = token ? `pnpm agent connect ${token}\npnpm agent onramp 3000` : "";
 
-  async function connect() {
-    setBusy(true);
-    setError(null);
-    try {
-      setToken(await api().cliToken());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
+  // a reference is single-use: fetch a fresh one whenever a deposit starts
+  const deposits = events.filter((e) => e.type === "onramp.started").length;
+  useEffect(() => {
+    if (!shown) return;
+    let alive = true;
+    api()
+      .depositDetails()
+      .then((d) => alive && setDetails(d))
+      .catch((e: Error) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [shown, deposits]);
+
+  const copy = (what: string, text: string) =>
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(what);
+      setTimeout(() => setCopied(null), 1400);
+    });
 
   if (!shown) {
     return (
       <p className="hero-hint mono">
-        deposits come from the terminal ·{" "}
         <button type="button" className="term-link ink" onClick={() => setShown(true)}>
-          connect the CLI →
+          add lira →
         </button>
       </p>
     );
   }
   return (
-    <div className="cli-box mono">
+    <div className="deposit-box">
       <header>
-        <span>add lira from your terminal</span>
-        {token ? (
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard?.writeText(commands).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1400);
-              });
-            }}
-          >
-            {copied ? "copied" : "copy"}
-          </button>
-        ) : (
-          <button type="button" disabled={busy} onClick={() => void connect()}>
-            {busy ? "creating a CLI key…" : "connect the CLI →"}
-          </button>
-        )}
+        <span>Add lira — send a bank transfer to</span>
+        <button type="button" onClick={() => setShown(false)} aria-label="Hide deposit details">
+          hide
+        </button>
       </header>
-      {token ? (
-        <pre>
-          <i>$</i> pnpm agent connect {token}
-          {"\n"}
-          <i>$</i> pnpm agent onramp 3000
-        </pre>
+      {error ? (
+        <p className="deposit-error">{error}</p>
       ) : (
-        <pre className="dim">
-          <i>$</i> pnpm agent connect &lt;your CLI key&gt;
-          {"\n"}
-          <i>$</i> pnpm agent onramp 3000
-        </pre>
+        <dl>
+          <div>
+            <dt>IBAN{details?.bankName ? ` · ${details.bankName}` : ""}</dt>
+            <dd className="mono">{details?.iban ?? "…"}</dd>
+            <button type="button" disabled={!details} onClick={() => details && copy("iban", details.iban)}>
+              {copied === "iban" ? "copied" : "copy"}
+            </button>
+          </div>
+          <div>
+            <dt>Description — must be exactly this</dt>
+            <dd className="mono">
+              <mark>{details?.reference ?? "…"}</mark>
+            </dd>
+            <button type="button" disabled={!details} onClick={() => details && copy("ref", details.reference)}>
+              {copied === "ref" ? "copied" : "copy"}
+            </button>
+          </div>
+          <div>
+            <dt>Amount</dt>
+            <dd>
+              ₺{details?.minTry ?? 50} – ₺{(details?.maxTry ?? 3000).toLocaleString("en-US")}
+            </dd>
+            <button type="button" disabled={!details} onClick={() => details && copy("both", `${details.iban.replace(/\s+/g, "")} ${details.reference}`)}>
+              {copied === "both" ? "copied" : "copy both"}
+            </button>
+          </div>
+        </dl>
       )}
-      <small>{error ?? (token ? "This key is a separate session for your account, valid for 7 days. The deposit shows up here the moment it starts." : "Run these in the pera-wallet repo. The key lets the CLI act for this account without your passkey.")}</small>
+      <small>It arrives as USDC and moves into the vault on its own. This page updates the moment the transfer lands.</small>
     </div>
   );
 }

@@ -6,6 +6,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "keys": "tsx keys.ts",
+    "bank": "tsx bank.ts",
     "bootstrap": "tsx bootstrap.ts",
     "smoke:onramp": "tsx onramp-smoke.ts",
     "smoke:policy": "tsx policy-smoke.ts",

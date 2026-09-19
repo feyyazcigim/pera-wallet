@@ -36,6 +36,7 @@ export const LoginVerifyBody = z.object({
 export const XdrBody = z.object({ xdr: z.string().min(20) });
 export const AuthorizeBuildBody = z.object({ dailyCapUsdc: DecimalUsdc.optional() });
 export const OnrampBody = z.object({ amountTry: DecimalTry });
+export const BankTransferBody = z.object({ iban: z.string().min(10).max(40), reference: z.string().min(4).max(40), amountTry: DecimalTry });
 export const OfframpBody = z.object({ amountUsdc: DecimalUsdc });
 export const AmountBody = z.object({ amountUsdc: DecimalUsdc });
 export const PolicyBody = z.object({ dailyCapUsdc: DecimalUsdc });
@@ -60,4 +61,4 @@ export const EventSchema = z.object({
 });
 export const ErrorSchema = z.object({ error: z.string(), code: z.string().optional(), errorCode: z.number().optional(), detail: z.unknown().optional() });
 
-export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, OfframpBody, AmountBody, PolicyBody, RulesBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
+export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, RulesBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };

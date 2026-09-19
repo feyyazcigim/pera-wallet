@@ -36,6 +36,8 @@ const paths = {
     get: { summary: "Cap, used, remaining, rule id — read from the spending_limit policy contract", security: bearer, responses: { 200: obj("PolicyView") } },
     post: { summary: "Submit the passkey-signed cap change (built by /agent/policy/build)", security: bearer, requestBody: { required: true, content: json("XdrBody") }, responses: { 200: obj("{ ruleId, txHash, dailyCapUsdc }") } },
   },
+  "/onramp/instructions": { post: { summary: "The user's deposit details: anchor IBAN + the reference that routes a bank transfer to their treasury (a SEP-6 order, reused until paid into)", security: bearer, responses: { 200: obj("{ iban, bankName, reference, anchorTxId, minTry, maxTry }") } } },
+  "/bank/transfer": { post: { summary: "Sandbox bank rail (public): pay amountTry to an IBAN with a reference — plays the bank for the mock anchor (pnpm bank)", requestBody: { required: true, content: json("BankTransferBody") }, responses: { 202: obj("{ reference, amountTry, status, anchorTxId }"), 404: err, 409: err } } },
   "/cli/token": { post: { summary: "Mint a separate session for the CLI (pnpm agent connect <token>); the passkey cannot be used from a terminal", security: bearer, responses: { 200: obj("{ token, expiresAt, connect }") } } },
   "/agent/rules": {
     get: { summary: "Router-enforced agent rules (weekly x402 limit, max price per call, allowed chains) + this week's spend", security: bearer, responses: { 200: obj("{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks, spentThisWeekUsdc, paymentsThisWeek, enforcedBy }") } },

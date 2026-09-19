@@ -28,7 +28,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     service: "pera-api",
     docs: "/openapi.yaml",
     auth: "passkey: POST /auth/register, POST /auth/login/options, POST /auth/login/verify",
-    routes: ["/status", "/me", "/cli/token", "/balances", "/onramp", "/onramp/:id", "/offramp", "/yield/deposit", "/yield/withdraw", "/yield/position", "/agent/policy", "/agent/authorize/build", "/agent/authorize", "/agent/policy/build", "/agent/rules", "/stellar/submit", "/agent/pay", "/agent/pay/over-cap-demo", "/evm/transfer", "/events", "/events/stream", "/admin/events"],
+    routes: ["/status", "/me", "/cli/token", "/balances", "/onramp", "/onramp/instructions", "/bank/transfer", "/onramp/:id", "/offramp", "/yield/deposit", "/yield/withdraw", "/yield/position", "/agent/policy", "/agent/authorize/build", "/agent/authorize", "/agent/policy/build", "/agent/rules", "/stellar/submit", "/agent/pay", "/agent/pay/over-cap-demo", "/evm/transfer", "/events", "/events/stream", "/admin/events"],
   }));
   app.get("/openapi.yaml", async (_req, reply) => {
     const file = path.join(repoRoot(), "openapi.yaml");

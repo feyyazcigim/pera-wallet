@@ -70,6 +70,16 @@ const STATEMENTS = [
   `create index if not exists evm_wallets_address on evm_wallets (lower(address))`,
   `create index if not exists events_user_ts on events (user_id, ts desc)`,
   `create index if not exists sessions_user on sessions (user_id)`,
+  `create table if not exists deposit_orders (
+     reference text primary key,
+     user_id text not null references users(id),
+     anchor_tx_id text not null,
+     iban text not null,
+     bank_name text,
+     status text not null default 'open',
+     created_at timestamptz not null default now()
+   )`,
+  `create index if not exists deposit_orders_user on deposit_orders (user_id, created_at desc)`,
   `create table if not exists agent_rules (
      user_id text primary key references users(id),
      weekly_cap_usdc text,

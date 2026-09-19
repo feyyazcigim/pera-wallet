@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { loadEnv } from "@pera/core";
 import { getSessionUser, type User } from "@pera/db";
 
-const PUBLIC_PREFIXES = ["/auth/", "/status", "/health", "/openapi.yaml"];
+// "/bank/" is the sandbox bank rail: like a real wire, anyone who knows the IBAN + reference can pay in.
+const PUBLIC_PREFIXES = ["/auth/", "/bank/", "/status", "/health", "/openapi.yaml"];
 
 declare module "fastify" {
   interface FastifyRequest {

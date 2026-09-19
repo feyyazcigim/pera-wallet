@@ -17,7 +17,8 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (err instanceof ContractInvokeError) return reply.status(502).send({ error: err.message, code: "CONTRACT_ERROR", errorCode: err.code ?? undefined, detail: { phase: err.phase, raw: err.raw } });
     if (err instanceof PaywallError) return reply.status(502).send({ error: err.message, code: "PAYWALL_ERROR", detail: { status: err.status, body: err.body } });
     const status = err.statusCode ?? 500;
-    if (status >= 500) log.error({ err }, "unhandled error");
+    // a route that sets its own statusCode (e.g. 503 YIELD_UNAVAILABLE) made a decision; only log what nobody anticipated
+    if (status >= 500 && !err.statusCode) log.error({ err }, "unhandled error");
     return reply.status(status).send({ error: err.message ?? "internal error", code: (typeof err.code === "string" && err.code) || (status >= 500 ? "INTERNAL" : "ERROR") });
   });
 }

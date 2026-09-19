@@ -1097,51 +1097,74 @@ h2.section-title:not(.section-head *) {
   font-size: 28px;
 }
 
-/* connect-the-CLI box under the balance */
-.cli-box {
+/* deposit details under the balance */
+.deposit-box {
   margin-top: 28px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  font-size: 12.5px;
 }
-.cli-box header {
+.deposit-box header {
   display: flex;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--line);
   background: var(--soft);
+  font-size: 13px;
   color: var(--muted);
 }
-.cli-box header button {
+.deposit-box button {
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: none;
-  font: inherit;
-  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
   cursor: pointer;
 }
-.cli-box pre {
+.deposit-box button:hover:not(:disabled) {
+  color: var(--ink);
+}
+.deposit-box dl {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr;
   margin: 0;
-  padding: 14px 16px 6px;
-  font: inherit;
-  line-height: 1.9;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
-.cli-box pre.dim {
+.deposit-box dl > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 20px;
+}
+.deposit-box dl > div + div {
+  border-left: 1px solid var(--line);
+}
+.deposit-box dt {
+  font-size: 12.5px;
   color: var(--muted);
 }
-.cli-box pre i {
-  font-style: normal;
-  color: var(--muted);
-  user-select: none;
+.deposit-box dd {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
-.cli-box small {
+.deposit-box dd.mono {
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.deposit-box dd mark {
+  padding: 1px 8px;
+  font-weight: 700;
+}
+.deposit-box small,
+.deposit-error {
   display: block;
-  padding: 0 16px 14px;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  padding: 12px 20px 14px;
+  border-top: 1px solid var(--line);
   font-size: 12.5px;
   color: var(--muted);
 }

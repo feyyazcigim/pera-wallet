@@ -150,6 +150,25 @@ components:
       required:
         - amountTry
       additionalProperties: false
+    BankTransferBody:
+      type: object
+      properties:
+        iban:
+          type: string
+          minLength: 10
+          maxLength: 40
+        reference:
+          type: string
+          minLength: 4
+          maxLength: 40
+        amountTry:
+          type: string
+          pattern: ^\d+(\.\d{1,2})?$
+      required:
+        - iban
+        - reference
+        - amountTry
+      additionalProperties: false
     OfframpBody:
       type: object
       properties:
@@ -534,6 +553,39 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /onramp/instructions:
+    post:
+      summary: "The user's deposit details: anchor IBAN + the reference that routes a
+        bank transfer to their treasury (a SEP-6 order, reused until paid into)"
+      security: *a2
+      responses:
+        "200":
+          description: "{ iban, bankName, reference, anchorTxId, minTry, maxTry }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /bank/transfer:
+    post:
+      summary: "Sandbox bank rail (public): pay amountTry to an IBAN with a reference
+        — plays the bank for the mock anchor (pnpm bank)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BankTransferBody"
+      responses:
+        "202":
+          description: "{ reference, amountTry, status, anchorTxId }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404": *a1
+        "409": *a1
   /cli/token:
     post:
       summary: Mint a separate session for the CLI (pnpm agent connect <token>); the

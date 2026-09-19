@@ -57,6 +57,7 @@ export type Rules = { weeklyCapUsdc: number | null; maxPerCallUsdc: number | nul
 export type RulesInput = Pick<Rules, "weeklyCapUsdc" | "maxPerCallUsdc" | "allowedNetworks">;
 export type PeraEvent = { id: string; ts: string; type: string; amountUsdc: number | null; network: string | null; txHash: string | null; explorerUrl: string | null; detail: Record<string, unknown> };
 export type PayResult = { paid: boolean; status: number; body: unknown; network: string | null; amountUsdc: number | null; txHash: string | null; explorerUrl: string | null; timeline: string[] };
+export type DepositDetails = { iban: string; bankName: string | null; reference: string; minTry: number; maxTry: number };
 export type PayPrefer = "auto" | "stellar" | "evm";
 
 export class ApiError extends Error {
@@ -91,6 +92,8 @@ export interface Backend {
   pay(url: string, prefer?: PayPrefer): Promise<PayResult>;
   overCapDemo(): Promise<string>; // → the chain's rejection, explained
   setCap(capUsdc: number, me: Me): Promise<void>;
+  /** The IBAN + reference that route a bank transfer to this user (a fresh reference once the last one is used). */
+  depositDetails(): Promise<DepositDetails>;
   /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
   cliToken(): Promise<string>;
 }
@@ -284,6 +287,7 @@ const httpBackend: Backend = {
     const r = await http<WireOverCap>("/agent/pay/over-cap-demo", { body: {} });
     return `Error(Contract, #${r.errorCode}) ${r.errorName} — ${r.explanation}`;
   },
+  depositDetails: async () => http<DepositDetails>("/onramp/instructions", { body: {} }),
   cliToken: async () => (await http<{ token: string }>("/cli/token", { body: {} })).token,
   // guide §5.7 — build → passkey signs in the browser (kit.signAdmin) → API submits it sponsored
   async setCap(capUsdc, me) {
