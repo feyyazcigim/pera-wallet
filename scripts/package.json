@@ -14,9 +14,11 @@
     "smoke:pay": "tsx pay-smoke.ts",
     "demo": "tsx demo.ts",
     "gen:openapi": "tsx gen-openapi.ts",
-    "bridge:resume": "tsx bridge-resume.ts"
+    "bridge:resume": "tsx bridge-resume.ts",
+    "smoke:mcp": "tsx mcp-smoke.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@pera/anchor": "workspace:*",
     "@pera/api": "workspace:*",
     "@pera/cctp": "workspace:*",

@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { childLogger, events, loadEnv, stellarTxUrl } from "@pera/core";
 import { getAnchorTx, offrampUsdcToTry, simulateBankTransfer, startOnramp, waitForStatus } from "@pera/anchor";
 import { autoDeposit, ensureLiquidity } from "@pera/yield";
-import { requireUser } from "../auth";
+import { requireOwner, requireScope } from "../auth";
 import { loadContext } from "../context";
 import { createDepositOrder, getDepositOrder, getOpenDepositOrder, listUnsettledDepositOrders, markDepositOrderFunded } from "@pera/db";
 import { BankTransferBody, OfframpBody, OnrampBody } from "../schemas";
@@ -37,7 +37,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
    * treasury. Opens a SEP-6 deposit order once and keeps returning it until it has been paid into.
    */
   app.post("/onramp/instructions", async (req) => {
-    const user = requireUser(req);
+    const user = requireScope(req, "fund");
     const open = await getOpenDepositOrder(user.id);
     if (open) return { iban: open.iban, bankName: open.bankName, reference: open.reference, anchorTxId: open.anchorTxId, minTry: 50, maxTry: 3000, createdAt: open.createdAt };
     const ctx = await loadContext(user.id);
@@ -74,7 +74,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
 
   /** SEP-6 deposit into the user's treasury account; the sandbox wire is simulated; completion tracked in the background. */
   app.post("/onramp", async (req, reply) => {
-    const ctx = await loadContext(requireUser(req).id);
+    const ctx = await loadContext(requireScope(req, "fund").id);
     const { amountTry } = OnrampBody.parse(req.body);
     const start = await startOnramp({ accountSecret: ctx.treasurySecret, amountTry, userId: ctx.userId });
     await simulateBankTransfer(start.id, amountTry);
@@ -83,7 +83,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/onramp/:id", async (req) => {
-    const ctx = await loadContext(requireUser(req).id);
+    const ctx = await loadContext(requireScope(req, "read").id);
     const { id } = req.params as { id: string };
     return getAnchorTx({ accountSecret: ctx.treasurySecret, id });
   });
@@ -91,7 +91,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
   /** SEP-6 withdrawal from the user's treasury (vault → treasury first if needed); SPONSOR pays the payment fee. */
   app.post("/offramp", async (req) => {
     const env = loadEnv();
-    const ctx = await loadContext(requireUser(req).id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { amountUsdc } = OfframpBody.parse(req.body);
     const liquidity = await ensureLiquidity(ctx, { neededUsdc: amountUsdc });
     const r = await offrampUsdcToTry({ accountSecret: ctx.treasurySecret, amountUsdc, userId: ctx.userId, sponsorSecret: env.SPONSOR_SECRET });

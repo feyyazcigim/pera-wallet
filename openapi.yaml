@@ -2,10 +2,11 @@ openapi: 3.0.3
 info:
   title: Pera Agent Wallet API
   version: 0.1.0
-  description: "Multi-user REST API for the Pera dashboard. Auth: passkey
-    (WebAuthn) → session bearer `ps_…`; the static API_BEARER_TOKEN is the admin
-    credential. All amounts are decimal USDC strings; every mutation returns tx
-    hashes and emits a per-user event."
+  description: "Multi-user REST + MCP API for the Pera dashboard and for AI
+    agents. Auth: passkey (WebAuthn) → owner session `ps_…` (everything); scoped
+    agent tokens `pat_…` (scopes read | pay | fund | admin) for AI runtimes; the
+    static API_BEARER_TOKEN is the admin credential. All amounts are decimal
+    USDC strings; every mutation returns tx hashes and emits a per-user event."
 servers:
   - url: http://localhost:3000
 components:
@@ -215,6 +216,10 @@ components:
             enum:
               - stellar:testnet
               - eip155:84532
+        approveAboveUsdc:
+          nullable: true
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
       required:
         - weeklyCapUsdc
         - maxPerCallUsdc
@@ -236,6 +241,107 @@ components:
       required:
         - url
         - prefer
+      additionalProperties: false
+    PayBodyV2:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        method:
+          default: GET
+          type: string
+          enum:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          type: string
+        prefer:
+          default: auto
+          type: string
+          enum:
+            - auto
+            - stellar
+            - evm
+        maxAmountUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+        approvalId:
+          type: string
+      required:
+        - url
+        - method
+        - prefer
+      additionalProperties: false
+    QuoteBody:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        method:
+          default: GET
+          type: string
+          enum:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          type: string
+        prefer:
+          default: auto
+          type: string
+          enum:
+            - auto
+            - stellar
+            - evm
+      required:
+        - url
+        - method
+        - prefer
+      additionalProperties: false
+    CreateTokenBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        scopes:
+          default:
+            - read
+            - pay
+          minItems: 1
+          type: array
+          items:
+            type: string
+            enum:
+              - read
+              - pay
+              - fund
+              - admin
+        ttlDays:
+          nullable: true
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 365
+      required:
+        - name
+        - scopes
       additionalProperties: false
     EvmTransferBody:
       type: object
@@ -710,15 +816,16 @@ paths:
                 additionalProperties: true
   /agent/pay:
     post:
-      summary: Run the x402 router for a URL; returns the paid body, tx hashes and the
-        event timeline
+      summary: "Pay a paywalled URL (x402): rules → approval threshold → on-chain cap
+        → settlement; returns the paid body, tx hashes and the event timeline.
+        Scope: pay"
       security: *a2
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PayBody"
+              $ref: "#/components/schemas/PayBodyV2"
       responses:
         "200":
           description: PayResult
@@ -727,7 +834,13 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        "409": *a1
+        "403": *a1
+        "409":
+          description: RULE_VIOLATION | SPENDING_CAP_EXCEEDED | APPROVAL_REQUIRED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "502": *a1
   /agent/pay/over-cap-demo:
     post:
@@ -762,6 +875,204 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /agent/quote:
+    post:
+      summary: "Probe a paywalled URL without paying: offers (price/network/payee) and
+        the rules' verdict (allow | requires_approval | denied). Scope: read"
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteBody"
+      responses:
+        "200":
+          description: Quote + verdict
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403": *a1
+  /agent/services:
+    get:
+      summary: "Paywalled endpoints the demo resource server advertises. Scope: read"
+      security: *a2
+      responses:
+        "200":
+          description: "{ resourceServer, endpoints[] }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/tokens:
+    get:
+      summary: List the user's agent tokens (owner session)
+      security: *a2
+      responses:
+        "200":
+          description: AgentToken[]
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403": *a1
+    post:
+      summary: Mint a scoped, revocable agent token (pat_…) for an AI runtime; the
+        secret is returned once (owner session)
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenBody"
+      responses:
+        "201":
+          description: "{ id, name, scopes, expiresAt, token }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403": *a1
+  /agent/tokens/{id}:
+    delete:
+      summary: Revoke an agent token (owner session)
+      security: *a2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{ ok }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404": *a1
+  /agent/connect/hermes:
+    post:
+      summary: Mint a read+pay token and return the Hermes config snippet, env line,
+        deep link and Claude Code command (owner session)
+      security: *a2
+      responses:
+        "200":
+          description: "{ tokenId, scopes, expiresAt, mcpUrl, snippetYaml, envLine,
+            deepLink, claudeCode, stdioShim, skill }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /approvals:
+    get:
+      summary: Approvals for payments above the owner's threshold
+        (?status=pending|approved|denied|expired|consumed)
+      security: *a2
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval[]
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /approvals/{id}:
+    get:
+      summary: One approval
+      security: *a2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404": *a1
+  /approvals/{id}/approve:
+    post:
+      summary: Owner approves a pending payment (owner session); the agent retries
+        with approval_id
+      security: *a2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "409": *a1
+  /approvals/{id}/deny:
+    post:
+      summary: Owner denies a pending payment (owner session)
+      security: *a2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "409": *a1
+  /mcp:
+    post:
+      summary: "MCP server (Streamable HTTP, stateless, JSON responses). Bearer =
+        agent token (pat_…) or passkey session. Tools: wallet_info,
+        get_balances, get_spending_policy, list_services, quote_payment,
+        pay_url, list_payments, request_funding — filtered by the token's
+        scopes"
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: JSON-RPC 2.0 request (initialize, tools/list, tools/call)
+      responses:
+        "200":
+          description: JSON-RPC 2.0 response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401": *a1
+        "403": *a1
   /events:
     get:
       summary: User's last 200 events, newest first

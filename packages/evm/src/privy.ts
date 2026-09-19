@@ -8,8 +8,16 @@ const log = childLogger("evm.privy");
 
 let client: PrivyClient | undefined;
 
+export function isPrivyConfigured(): boolean {
+  const env = loadEnv();
+  return Boolean(env.PRIVY_APP_ID && env.PRIVY_APP_SECRET);
+}
+
 export function getPrivy(): PrivyClient {
   const env = loadEnv();
+  if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET) {
+    throw Object.assign(new Error("Privy is not configured: set PRIVY_APP_ID and PRIVY_APP_SECRET (dashboard.privy.io → App settings) — EVM wallets, sign-up and Base payments need it"), { statusCode: 503, code: "PRIVY_NOT_CONFIGURED" });
+  }
   client ??= new PrivyClient({ appId: env.PRIVY_APP_ID, appSecret: env.PRIVY_APP_SECRET });
   return client;
 }

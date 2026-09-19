@@ -87,6 +87,35 @@ const STATEMENTS = [
      allowed_networks text not null default 'stellar:testnet,eip155:84532',
      updated_at timestamptz not null default now()
    )`,
+  `alter table agent_rules add column if not exists approve_above_usdc text`,
+  `create table if not exists agent_tokens (
+     id text primary key,
+     user_id text not null references users(id),
+     name text not null,
+     token_hash text not null unique,
+     scopes text not null,
+     created_at timestamptz not null default now(),
+     expires_at timestamptz,
+     last_used_at timestamptz,
+     revoked_at timestamptz
+   )`,
+  `create index if not exists agent_tokens_user on agent_tokens (user_id)`,
+  `create table if not exists approvals (
+     id text primary key,
+     user_id text not null references users(id),
+     kind text not null default 'pay',
+     url text not null,
+     method text not null default 'GET',
+     offers jsonb,
+     amount_usdc text not null,
+     network text,
+     status text not null default 'pending',
+     created_at timestamptz not null default now(),
+     expires_at timestamptz not null,
+     resolved_at timestamptz,
+     consumed_at timestamptz
+   )`,
+  `create index if not exists approvals_user_status on approvals (user_id, status, created_at desc)`,
 ];
 
 let done: Promise<void> | undefined;

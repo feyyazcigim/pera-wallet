@@ -26,7 +26,8 @@
     "smoke:pay": "pnpm --filter @pera/scripts smoke:pay",
     "demo": "pnpm --filter @pera/scripts demo",
     "gen:openapi": "pnpm --filter @pera/scripts gen:openapi",
-    "bridge:resume": "pnpm --filter @pera/scripts bridge:resume"
+    "bridge:resume": "pnpm --filter @pera/scripts bridge:resume",
+    "smoke:mcp": "pnpm --filter @pera/scripts smoke:mcp"
   },
   "devDependencies": {
     "@types/node": "24.13.6",

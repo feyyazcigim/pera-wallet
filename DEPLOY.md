@@ -40,6 +40,14 @@ SPA fallback to `index.html` (client-side routes under `/app`), env
 `VITE_API_URL=https://<api-host>`, `VITE_RESOURCE_SERVER_URL=https://<rs-host>`. Its domain must equal
 `PASSKEY_RP_ID` and appear in `PASSKEY_ORIGINS` on the API — passkeys are bound to the origin.
 
+## MCP endpoint (AI agents)
+
+Served by `pera-api` at `https://<api-host>/mcp` — nothing extra to deploy. Users mint agent tokens in the dashboard
+(`POST /agent/tokens`) and point Hermes / Claude / Cursor at the URL with `Authorization: Bearer pat_…`. Keep the
+proxy read timeout ≥ 180 s on that route (a `pay_url` on Base Sepolia bridges USDC through CCTP first). If a user runs
+Hermes behind its egress allowlist, `<api-host>` must be allowed. Browsers calling `/mcp` must come from an origin in
+`PASSKEY_ORIGINS` (non-browser agents send no Origin and pass).
+
 ## Privy setup (EVM gas sponsorship)
 
 Dashboard → App settings → Basics (App ID / App Secret) → Wallets → Advanced: enable **TEE execution** →

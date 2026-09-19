@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getDb } from "./client";
 import { decryptSecret, encryptSecret } from "./crypto";
 
@@ -272,6 +272,8 @@ export async function countUsers(): Promise<number> {
 // ---- agent rules (router-enforced; the daily cap lives on-chain in the spending_limit policy) ----
 
 export interface AgentRules {
+  /** Single payments above this need a human approval in the dashboard; null = never (default). */
+  approveAboveUsdc?: string | null;
   /** Max USDC the agent may pay over x402 in a rolling 7 days; null = no weekly limit. */
   weeklyCapUsdc: string | null;
   /** Max price of a single paywall call; null = no per-call limit. */
@@ -280,7 +282,7 @@ export interface AgentRules {
   allowedNetworks: string[];
 }
 
-export const DEFAULT_AGENT_RULES: AgentRules = { weeklyCapUsdc: null, maxPerCallUsdc: null, allowedNetworks: ["stellar:testnet", "eip155:84532"] };
+export const DEFAULT_AGENT_RULES: AgentRules = { approveAboveUsdc: null, weeklyCapUsdc: null, maxPerCallUsdc: null, allowedNetworks: ["stellar:testnet", "eip155:84532"] };
 
 export async function getAgentRules(userId: string): Promise<AgentRules> {
   const db = await getDb();
@@ -288,6 +290,7 @@ export async function getAgentRules(userId: string): Promise<AgentRules> {
   const r = rows[0];
   if (!r) return { ...DEFAULT_AGENT_RULES, allowedNetworks: [...DEFAULT_AGENT_RULES.allowedNetworks] };
   return {
+    approveAboveUsdc: (r.approve_above_usdc as string | null) ?? null,
     weeklyCapUsdc: (r.weekly_cap_usdc as string | null) ?? null,
     maxPerCallUsdc: (r.max_per_call_usdc as string | null) ?? null,
     allowedNetworks: String(r.allowed_networks ?? "").split(",").map((x) => x.trim()).filter(Boolean),
@@ -297,9 +300,9 @@ export async function getAgentRules(userId: string): Promise<AgentRules> {
 export async function upsertAgentRules(userId: string, rules: AgentRules): Promise<AgentRules> {
   const db = await getDb();
   await db.query(
-    `insert into agent_rules (user_id, weekly_cap_usdc, max_per_call_usdc, allowed_networks, updated_at) values ($1, $2, $3, $4, now())
-     on conflict (user_id) do update set weekly_cap_usdc = excluded.weekly_cap_usdc, max_per_call_usdc = excluded.max_per_call_usdc, allowed_networks = excluded.allowed_networks, updated_at = now()`,
-    [userId, rules.weeklyCapUsdc, rules.maxPerCallUsdc, rules.allowedNetworks.join(",")],
+    `insert into agent_rules (user_id, weekly_cap_usdc, max_per_call_usdc, allowed_networks, approve_above_usdc, updated_at) values ($1, $2, $3, $4, $5, now())
+     on conflict (user_id) do update set weekly_cap_usdc = excluded.weekly_cap_usdc, max_per_call_usdc = excluded.max_per_call_usdc, allowed_networks = excluded.allowed_networks, approve_above_usdc = excluded.approve_above_usdc, updated_at = now()`,
+    [userId, rules.weeklyCapUsdc, rules.maxPerCallUsdc, rules.allowedNetworks.join(","), rules.approveAboveUsdc ?? null],
   );
   return getAgentRules(userId);
 }
@@ -365,4 +368,144 @@ export async function listUnsettledDepositOrders(maxAgeMs = 6 * 3600_000): Promi
     [new Date(Date.now() - maxAgeMs)],
   );
   return rows.map(toOrder);
+}
+
+// ---------------------------------------------------------------------------- agent tokens (scoped, revocable)
+export type AgentScope = "read" | "pay" | "fund" | "admin";
+export const ALL_SCOPES: AgentScope[] = ["read", "pay", "fund", "admin"];
+
+export interface AgentToken {
+  id: string;
+  userId: string;
+  name: string;
+  scopes: AgentScope[];
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+const rowToToken = (r: Record<string, unknown>): AgentToken => ({
+  id: String(r.id),
+  userId: String(r.user_id),
+  name: String(r.name),
+  scopes: String(r.scopes).split(",").filter(Boolean) as AgentScope[],
+  createdAt: new Date(r.created_at as string).toISOString(),
+  expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : null,
+  lastUsedAt: r.last_used_at ? new Date(r.last_used_at as string).toISOString() : null,
+  revokedAt: r.revoked_at ? new Date(r.revoked_at as string).toISOString() : null,
+});
+
+export function hashAgentToken(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
+/** Mints a `pat_…` secret (returned once) and stores only its hash. */
+export async function createAgentToken(p: { userId: string; name: string; scopes: AgentScope[]; ttlDays?: number | null }): Promise<{ token: AgentToken; secret: string }> {
+  const db = await getDb();
+  const secret = `pat_${randomBytes(32).toString("base64url")}`;
+  const id = randomUUID();
+  const expiresAt = p.ttlDays ? new Date(Date.now() + p.ttlDays * 24 * 3600_000) : null;
+  const rows = await db.query("insert into agent_tokens (id, user_id, name, token_hash, scopes, expires_at) values ($1, $2, $3, $4, $5, $6) returning *", [id, p.userId, p.name, hashAgentToken(secret), p.scopes.join(","), expiresAt]);
+  return { token: rowToToken(rows[0]!), secret };
+}
+
+/** Resolves a presented `pat_…` secret to its user + scopes (null when unknown, revoked or expired). */
+export async function getAgentTokenUser(secret: string): Promise<{ user: User; token: AgentToken } | null> {
+  const db = await getDb();
+  const rows = await db.query(
+    `select t.*, u.id as u_id, u.display_name as u_display_name, u.email as u_email, u.created_at as u_created_at
+     from agent_tokens t join users u on u.id = t.user_id
+     where t.token_hash = $1 and t.revoked_at is null and (t.expires_at is null or t.expires_at > now())`,
+    [hashAgentToken(secret)],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  await db.query("update agent_tokens set last_used_at = now() where id = $1", [r.id]);
+  return { token: rowToToken(r), user: { id: String(r.u_id), displayName: String(r.u_display_name), email: (r.u_email as string | null) ?? null, createdAt: new Date(r.u_created_at as string).toISOString() } };
+}
+
+export async function listAgentTokens(userId: string): Promise<AgentToken[]> {
+  const db = await getDb();
+  const rows = await db.query("select * from agent_tokens where user_id = $1 order by created_at desc", [userId]);
+  return rows.map(rowToToken);
+}
+
+export async function revokeAgentToken(userId: string, id: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db.query("update agent_tokens set revoked_at = now() where id = $1 and user_id = $2 and revoked_at is null returning id", [id, userId]);
+  return rows.length > 0;
+}
+
+// ---------------------------------------------------------------------------- approvals (human-in-the-loop for large payments)
+export type ApprovalStatus = "pending" | "approved" | "denied" | "expired" | "consumed";
+
+export interface Approval {
+  id: string;
+  userId: string;
+  kind: "pay";
+  url: string;
+  method: string;
+  offers: unknown;
+  amountUsdc: string;
+  network: string | null;
+  status: ApprovalStatus;
+  createdAt: string;
+  expiresAt: string;
+  resolvedAt: string | null;
+  consumedAt: string | null;
+}
+
+const rowToApproval = (r: Record<string, unknown>): Approval => ({
+  id: String(r.id),
+  userId: String(r.user_id),
+  kind: "pay",
+  url: String(r.url),
+  method: String(r.method),
+  offers: typeof r.offers === "string" ? JSON.parse(r.offers) : r.offers,
+  amountUsdc: String(r.amount_usdc),
+  network: (r.network as string | null) ?? null,
+  status: (new Date(r.expires_at as string).getTime() < Date.now() && r.status === "pending" ? "expired" : String(r.status)) as ApprovalStatus,
+  createdAt: new Date(r.created_at as string).toISOString(),
+  expiresAt: new Date(r.expires_at as string).toISOString(),
+  resolvedAt: r.resolved_at ? new Date(r.resolved_at as string).toISOString() : null,
+  consumedAt: r.consumed_at ? new Date(r.consumed_at as string).toISOString() : null,
+});
+
+/** Returns an existing pending approval for the same url+amount, or creates one (24 h). */
+export async function requestApproval(p: { userId: string; url: string; method?: string; offers?: unknown; amountUsdc: string; network?: string }): Promise<{ approval: Approval; created: boolean }> {
+  const db = await getDb();
+  const existing = await db.query("select * from approvals where user_id = $1 and url = $2 and amount_usdc = $3 and status = 'pending' and expires_at > now() order by created_at desc limit 1", [p.userId, p.url, p.amountUsdc]);
+  if (existing[0]) return { approval: rowToApproval(existing[0]), created: false };
+  const rows = await db.query(
+    "insert into approvals (id, user_id, url, method, offers, amount_usdc, network, expires_at) values ($1, $2, $3, $4, $5, $6, $7, $8) returning *",
+    [randomUUID(), p.userId, p.url, p.method ?? "GET", p.offers ? JSON.stringify(p.offers) : null, p.amountUsdc, p.network ?? null, new Date(Date.now() + 24 * 3600_000)],
+  );
+  return { approval: rowToApproval(rows[0]!), created: true };
+}
+
+export async function getApproval(userId: string, id: string): Promise<Approval | null> {
+  const db = await getDb();
+  const rows = await db.query("select * from approvals where id = $1 and user_id = $2", [id, userId]);
+  return rows[0] ? rowToApproval(rows[0]) : null;
+}
+
+export async function listApprovals(userId: string, status?: ApprovalStatus, limit = 50): Promise<Approval[]> {
+  const db = await getDb();
+  const rows = status
+    ? await db.query("select * from approvals where user_id = $1 and status = $2 order by created_at desc limit $3", [userId, status, limit])
+    : await db.query("select * from approvals where user_id = $1 order by created_at desc limit $2", [userId, limit]);
+  return rows.map(rowToApproval);
+}
+
+export async function resolveApproval(userId: string, id: string, decision: "approved" | "denied"): Promise<Approval | null> {
+  const db = await getDb();
+  const rows = await db.query("update approvals set status = $3, resolved_at = now() where id = $1 and user_id = $2 and status = 'pending' and expires_at > now() returning *", [id, userId, decision]);
+  return rows[0] ? rowToApproval(rows[0]) : null;
+}
+
+export async function consumeApproval(userId: string, id: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db.query("update approvals set status = 'consumed', consumed_at = now() where id = $1 and user_id = $2 and status = 'approved' returning id", [id, userId]);
+  return rows.length > 0;
 }

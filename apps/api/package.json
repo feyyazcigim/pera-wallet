@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@pera/anchor": "workspace:*",
     "@pera/cctp": "workspace:*",
     "@pera/core": "workspace:*",
