@@ -48,13 +48,13 @@ export function Onboard() {
 
   /**
    * One Continue. Someone whose passkey is on this device is signed in and never sees a form; only a new person is
-   * asked their name. `other` is the quiet link for a passkey that lives on a phone or a security key.
+   * asked their name.
    */
-  async function enter(kind: "here" | "other") {
+  async function enter() {
     session.setDemo(false);
     setPhase("checking");
     try {
-      const token = kind === "other" ? await api().login() : await api().signInIfKnown();
+      const token = await api().signInIfKnown();
       if (token === null) return setPhase("name");
       session.setToken(token);
       nav("/app", { replace: true });
@@ -145,7 +145,7 @@ export function Onboard() {
                     Welcome to <mark>pera</mark>.
                   </h2>
                   <p className="muted onb-lead">One press. If this device already has a wallet you're signed in, otherwise we set one up for you.</p>
-                  <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void enter("here")} {...BTN}>
+                  <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void enter()} {...BTN}>
                     {busy ? "Waiting for your passkey…" : "Continue"}
                   </ArrowFillButton>
                 </div>
@@ -153,20 +153,13 @@ export function Onboard() {
 
               {!supported && <p className="onb-error">This browser doesn't support passkeys. Try Safari or Chrome on a device with Touch ID / Face ID.</p>}
 
-              <p className="onb-demo">
-                {phase === "name" ? (
+              {phase === "name" && (
+                <p className="onb-demo">
                   <button type="button" onClick={() => setPhase("idle")}>
                     ← back
                   </button>
-                ) : (
-                  <>
-                    Passkey on your phone or a security key?{" "}
-                    <button type="button" disabled={busy} onClick={() => void enter("other")}>
-                      Sign in with it
-                    </button>
-                  </>
-                )}
-              </p>
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
