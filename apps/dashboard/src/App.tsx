@@ -76,14 +76,22 @@ export default function App() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const small = vw <= 760;
+  // the pill is exactly as wide as the headline's second line: it starts at the Y of "Your" and ends at the full stop
+  const headlineRef = useRef<HTMLSpanElement>(null);
+  const [headlineW, setHeadlineW] = useState(0);
+  useEffect(() => {
+    const measure = () => setHeadlineW(headlineRef.current?.offsetWidth ?? 0);
+    measure();
+    void document.fonts?.ready.then(measure);
+  }, [vw]);
+  const pillW = small || !headlineW ? Math.min(1120, vw - (small ? 24 : 48)) : Math.min(headlineW, vw - 48);
   const pill = scrolled
-    ? { maxWidth: Math.min(1120, vw - (small ? 24 : 48)), marginTop: 10, height: small ? 54 : 60, borderRadius: 40, paddingLeft: small ? 20 : 30, paddingRight: 8 }
+    ? { maxWidth: pillW, marginTop: 10, height: small ? 54 : 60, borderRadius: 40, paddingLeft: small ? 20 : 30, paddingRight: 8 }
     : { maxWidth: vw, marginTop: 0, height: small ? 60 : 74, borderRadius: 0, paddingLeft: small ? 20 : 48, paddingRight: small ? 12 : 48 };
 
   // hero copy drifts up and fades as you scroll away
   const heroOpacity = useTransform(scrollY, [0, 520], [1, 0]);
   const heroY = useTransform(scrollY, [0, 520], [0, -110]);
-  const heroScale = useTransform(scrollY, [0, 520], [1, 0.92]);
 
   // stage: grows in while it enters, then pins — scrolling walks the flow 1 → 2 → 3 → 4
   const pinRef = useRef<HTMLDivElement>(null);
@@ -132,11 +140,13 @@ export default function App() {
 
       <main>
         <section className="hero">
-          <motion.div style={{ opacity: heroOpacity, y: heroY, scale: heroScale }}>
+          <motion.div style={{ opacity: heroOpacity, y: heroY }}>{/* no scale: the header pill lines up with the headline's edges */}
             <h1>
               <Line delay={0.05}>Your lira earns.</Line>
               <Line delay={0.18}>
-                Your agent <Hl delay={0.75}>spends</Hl>.
+                <span ref={headlineRef} className="headline-measure">
+                  Your agent <Hl delay={0.75}>spends</Hl>.
+                </span>
               </Line>
             </h1>
             <motion.p

@@ -75,16 +75,16 @@ mark {
   border: 1px solid transparent;
   border-bottom-color: var(--line);
   background: rgb(255 255 255 / 0.85);
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   pointer-events: auto;
   transition: border-color 0.4s, background 0.4s, box-shadow 0.4s;
 }
 .nav.pill .nav-inner {
   border-color: var(--line);
   background: rgb(255 255 255 / 0.8);
-  backdrop-filter: blur(22px) saturate(1.4);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -22px rgb(0 0 0 / 0.22);
 }
 .nav nav {
@@ -206,6 +206,10 @@ h1 .line {
   overflow: hidden;
   padding: 0.04em 0 0.14em;
   margin-bottom: -0.14em;
+}
+/* inline-block so its width is the text's, which the header pill copies */
+.headline-measure {
+  display: inline-block;
 }
 h1 .line > span {
   display: block;

@@ -259,6 +259,11 @@ const timelineLabel = (e: WireEvent) => `${e.type}${e.amountUsdc ? ` · ${e.amou
 
 let yieldRetryAt = 0;
 
+/** Sign-in already tells us who this is: keep the name so the dashboard's first paint greets them by it. */
+function rememberOwner(r: WireSession) {
+  if (r.user?.displayName) ls.set(NAME_KEY, r.user.displayName);
+}
+
 /* ── the real backend ─────────────────────────────────────────────────── */
 const httpBackend: Backend = {
   // guide §5.1 — one passkey ceremony; POST /auth/register runs ~25–35 s while the wallet is provisioned
@@ -271,6 +276,7 @@ const httpBackend: Backend = {
       auth: false,
     });
     ls.set(CREDENTIAL_KEY, registration.id);
+    rememberOwner(r);
     return r.token;
   },
   // guide §5.2
@@ -280,6 +286,7 @@ const httpBackend: Backend = {
     const assertion = await startAuthentication({ optionsJSON: { challenge: o.challenge, rpId: o.rpId, allowCredentials: o.allowCredentials, userVerification: "required", timeout: 60_000 } });
     const r = await http<WireSession>("/auth/login/verify", { body: { challenge: o.challenge, assertion }, auth: false });
     ls.set(CREDENTIAL_KEY, assertion.id);
+    rememberOwner(r);
     return r.token;
   },
   async logout() {

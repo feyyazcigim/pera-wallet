@@ -58,7 +58,7 @@ function Frame() {
                 <i /> demo data
               </span>
             )}
-            <b>{me?.displayName ?? "…"}</b>
+            <b>{me?.displayName ?? session.name() ?? ""}</b>
             <button type="button" onClick={() => void signOut()}>
               Sign out
             </button>
