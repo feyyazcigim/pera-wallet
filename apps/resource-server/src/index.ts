@@ -54,7 +54,7 @@ const server = new x402ResourceServer(facilitators).register(STELLAR_CAIP2, new 
 if (payToEvm) server.register(BASE_SEPOLIA_CAIP2, new ExactEvmScheme());
 
 const stellarOffer = { scheme: "exact", price: "$0.01", network: STELLAR_CAIP2, payTo: payToStellar } as const;
-const evmOffer = payToEvm ? ({ scheme: "exact", price: "$0.01", network: BASE_SEPOLIA_CAIP2, payTo: payToEvm } as const) : undefined;
+const evmOffer = payToEvm ? ({ scheme: "exact", price: "$1.00", network: BASE_SEPOLIA_CAIP2, payTo: payToEvm } as const) : undefined; // $1 on Base: worth a CCTP bridge, and a visible line in the ledger
 
 const routes: Record<string, RouteConfig> = {
   "GET /api/stellar/weather": {
