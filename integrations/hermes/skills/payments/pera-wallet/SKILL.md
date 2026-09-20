@@ -30,7 +30,10 @@ Tool names appear as `mcp__pera_wallet__<tool>` (if your Hermes shows `mcp_pera_
 3. Pay with `pay_url { url, max_amount_usdc? }`. Set `max_amount_usdc` to the quoted price (a small safety margin is fine).
    The tool fetches the resource, pays the 402 and returns the **paid response body** plus a receipt.
 4. Report the result to the user with the receipt: `amountUsdc`, `network`, `txHash`, `explorerUrl`.
-5. If `status` is `requires_approval`: stop, tell the user the `approveUrl` (they approve in the dashboard), then retry
+5. If `status` is `pending` (Base payments bridge USDC from Stellar via CCTP first, 1–3 min): call
+   `payment_status { job_id }` — it waits up to 45 s per call — until the status is `paid` or an error. Never call
+   `pay_url` again for the same request; that would pay twice.
+6. If `status` is `requires_approval`: stop, tell the user the `approveUrl` (they approve in the dashboard), then retry
    the same call with `approval_id`. If `status` is `denied`: report `reason` and do not retry with the same arguments.
 6. If balances are too low, tell the user to add lira from the Pera dashboard (Home, "add lira");
    you cannot fund the wallet yourself.

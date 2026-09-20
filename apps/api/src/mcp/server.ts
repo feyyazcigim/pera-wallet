@@ -8,7 +8,9 @@ import { getPosition, isConfigured } from "@pera/yield";
 import { ApprovalRequiredError, PaywallError, RuleViolationError } from "@pera/x402-router";
 import { SpendingCapExceededError } from "@pera/smart-account";
 import { loadContext } from "../context";
+import { startPayJob, waitForPayJob, type PayJob } from "../services/jobs";
 import { executePayment, listServices, quotePayment, rulesView } from "../services/payments";
+import type { PayResult } from "@pera/x402-router";
 
 const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/).describe("decimal USDC amount, e.g. \"0.25\"");
 const Network = z.enum(["stellar:testnet", "eip155:84532"]);
@@ -50,6 +52,46 @@ function toolError(err: unknown): ToolResult {
   const e = err as Error & { code?: string; statusCode?: number };
   return fail(typeof e.code === "string" ? e.code : "ERROR", e.message ?? String(err));
 }
+
+/** Receipt for a finished payment (paid or free). */
+function receipt(r: PayResult): ToolResult {
+  const data = {
+    status: r.paid ? "paid" : "free",
+    url: r.url,
+    httpStatus: r.status,
+    network: r.network ?? null,
+    amountUsdc: r.amountUsdc ?? null,
+    payTo: r.payTo ?? null,
+    payer: r.payer ?? null,
+    txHash: r.txHash ?? null,
+    explorerUrl: r.explorerUrl ?? null,
+    float: r.float ?? null,
+    bridged: r.bridged ?? null,
+    body: truncate(r.body),
+  };
+  return ok(r.paid ? `Paid ${r.amountUsdc} USDC on ${r.network} for ${r.url} — tx ${r.txHash} (${r.explorerUrl})` : `${r.url} was free (HTTP ${r.status})`, data);
+}
+
+/** A payment job as a tool result: receipt, structured error, or a pending marker the model must poll with payment_status. */
+function jobResult(job: PayJob | null): ToolResult {
+  if (!job) return fail("NOT_FOUND", "unknown or expired job id");
+  if (job.status === "failed") return toolError(job.error);
+  if (job.status === "done") return receipt(job.result!);
+  const elapsed = Math.round((Date.now() - Date.parse(job.startedAt)) / 1000);
+  const last = job.steps.at(-1) ?? "starting";
+  return ok(`Payment for ${job.url} is still in progress (${elapsed}s, last step: ${last}). A Base payment bridges USDC via CCTP first (1–3 min). Call payment_status { job_id: "${job.id}" } to wait for it — do NOT call pay_url again for this request.`, {
+    status: "pending",
+    jobId: job.id,
+    url: job.url,
+    elapsedSeconds: elapsed,
+    lastStep: last,
+    steps: job.steps,
+    checkWith: "payment_status",
+  });
+}
+
+/** How long pay_url waits inline before handing back a job id: Stellar payments finish well within it; proxies cut at 100 s. */
+const INLINE_WAIT_MS = 40_000;
 
 /** One McpServer per request (stateless transport), bound to the authenticated user and their token scopes. */
 export function buildMcpServer(principal: McpPrincipal): McpServer {
@@ -187,7 +229,7 @@ export function buildMcpServer(principal: McpPrincipal): McpServer {
     "pay_url",
     {
       title: "Pay a paywall and fetch the resource",
-      description: "Fetch a URL and, if it answers HTTP 402 (x402), pay it from the user's wallet and return the paid response. Payment goes through the owner's rules, the approval threshold and the smart account's on-chain daily cap; a refused payment returns status \"denied\" or \"requires_approval\" (then ask the human to approve at approveUrl and retry with approval_id). Cite txHash/explorerUrl from the receipt.",
+      description: "Fetch a URL and, if it answers HTTP 402 (x402), pay it from the user's wallet and return the paid response. Payment goes through the owner's rules, the approval threshold and the smart account's on-chain daily cap; a refused payment returns status \"denied\" or \"requires_approval\" (then ask the human to approve at approveUrl and retry with approval_id). Slow payments (Base: CCTP bridge first, 1–3 min) return status \"pending\" with a jobId — poll payment_status, never call pay_url again for the same request. Cite txHash/explorerUrl from the receipt.",
       inputSchema: {
         ...requestShape,
         max_amount_usdc: DecimalUsdc.optional().describe("refuse to pay more than this for this call"),
@@ -199,25 +241,26 @@ export function buildMcpServer(principal: McpPrincipal): McpServer {
       const denied = guard("pay");
       if (denied) return denied;
       try {
-        const r = await executePayment(userId, { url: args.url, method: args.method, headers: args.headers, body: args.body, prefer: args.prefer, maxAmountUsdc: args.max_amount_usdc, approvalId: args.approval_id });
-        const receipt = {
-          status: r.paid ? "paid" : "free",
-          url: r.url,
-          httpStatus: r.status,
-          network: r.network ?? null,
-          amountUsdc: r.amountUsdc ?? null,
-          payTo: r.payTo ?? null,
-          payer: r.payer ?? null,
-          txHash: r.txHash ?? null,
-          explorerUrl: r.explorerUrl ?? null,
-          float: r.float ?? null,
-          bridged: r.bridged ?? null,
-          body: truncate(r.body),
-        };
-        return ok(r.paid ? `Paid ${r.amountUsdc} USDC on ${r.network} for ${r.url} — tx ${r.txHash} (${r.explorerUrl})` : `${r.url} was free (HTTP ${r.status})`, receipt);
+        const job = startPayJob(userId, args.url, () => executePayment(userId, { url: args.url, method: args.method, headers: args.headers, body: args.body, prefer: args.prefer, maxAmountUsdc: args.max_amount_usdc, approvalId: args.approval_id }));
+        return jobResult(await waitForPayJob(job.id, userId, INLINE_WAIT_MS));
       } catch (err) {
         return toolError(err);
       }
+    },
+  ));
+
+  reg("read", () => server.registerTool(
+    "payment_status",
+    {
+      title: "Wait for a pending payment",
+      description: "Waits (up to wait_seconds, default 45) for a payment that pay_url returned as status \"pending\" and returns its receipt, its error, or \"pending\" again with the latest step (bridge.burned → bridge.attested → bridge.minted → x402.paid). Keep calling it until the status is not pending.",
+      inputSchema: { job_id: z.string().describe("jobId from a pending pay_url result"), wait_seconds: z.number().int().min(0).max(60).default(45) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ job_id, wait_seconds }) => {
+      const denied = guard("read");
+      if (denied) return denied;
+      return jobResult(await waitForPayJob(job_id, userId, wait_seconds * 1000));
     },
   ));
 
@@ -246,4 +289,5 @@ const INSTRUCTIONS = `Pera is the user's crypto wallet on Stellar (+ Base Sepoli
 Rules of engagement: (1) call wallet_info once per session; (2) never guess prices — quote_payment first when the price is unknown;
 (3) pay_url pays only within the owner's rules and the on-chain daily cap; if it returns status=requires_approval, tell the human to open approveUrl, then retry with approval_id;
 (4) if status=denied, do not retry with the same arguments — report the reason; (5) cite txHash and explorerUrl for every payment;
-(6) the agent cannot fund the wallet or change its rules: only the owner can, from the dashboard. Amounts are decimal USDC strings.`;
+(6) the agent cannot fund the wallet or change its rules: only the owner can, from the dashboard;
+(7) pay_url may answer status=pending with a jobId (Base payments bridge USDC via CCTP first, 1–3 min): call payment_status with that jobId until it is paid or failed — never call pay_url again for the same request. Amounts are decimal USDC strings.`;
