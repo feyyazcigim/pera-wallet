@@ -61,6 +61,11 @@ const routes: Record<string, RouteConfig> = {
   },
   ...(evmOffer
     ? {
+        "GET /api/base/weather": {
+          accepts: [evmOffer],
+          description: "Live Istanbul weather (Open-Meteo), paid on Base Sepolia only (USDC bridged from Stellar via CCTP)",
+          mimeType: "application/json",
+        },
         "GET /api/base/summary": {
           accepts: [evmOffer],
           description: "Market summary, paid on Base Sepolia (USDC bridged from Stellar via CCTP)",
@@ -86,13 +91,16 @@ app.get("/", (_req, res) =>
 
 app.use(paymentMiddleware(routes, server));
 
-app.get("/api/stellar/weather", async (_req, res) => {
+// Same data behind two paywalls: Stellar-only and Base-only, so each rail can be exercised on its own.
+const weather = (paidWith: string) => async (_req: express.Request, res: express.Response) => {
   try {
-    res.json({ city: "Istanbul", ...(await fetchIstanbulWeather()), paidWith: STELLAR_CAIP2, servedAt: new Date().toISOString() });
+    res.json({ city: "Istanbul", ...(await fetchIstanbulWeather()), paidWith, servedAt: new Date().toISOString() });
   } catch (err) {
     res.status(502).json({ error: `weather upstream failed: ${(err as Error).message}` });
   }
-});
+};
+app.get("/api/stellar/weather", weather(STELLAR_CAIP2));
+app.get("/api/base/weather", weather(BASE_SEPOLIA_CAIP2));
 
 app.get("/api/base/summary", (_req, res) => {
   res.json({

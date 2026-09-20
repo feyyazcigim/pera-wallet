@@ -68,7 +68,7 @@ output with nginx (SPA fallback in `apps/dashboard/nginx.conf`, needed for `/app
 Order: 1 → 2 → 3. Builds are memory-hungry: deploy one Application at a time. 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time. 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time.
 
 ## 4 · Optional: demo paywalls (`pera-resource-server`, port 4000)
-Three x402 endpoints (`/api/stellar/weather` — Stellar only, `/api/base/summary` — Base only, `/api/any/quote` — both)
+x402 endpoints (`/api/stellar/weather` — Stellar only; `/api/base/weather` and `/api/base/summary` — Base only; `/api/any/quote` — both)
 at $0.01 each, so agents have something to pay on testnet. Application → GitHub `pera-wallet`, **Nixpacks**, Build
 Path `/`, domain `x402.<domain>` → port 4000, HTTPS. Env:
 ```
