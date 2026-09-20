@@ -62,101 +62,91 @@ export function Agents() {
     <>
       <header className="page-title">
         <h1>Agents</h1>
-        <p>Give Hermes, Claude Code or any MCP client a key to this wallet. Keys are scoped and revocable; the daily limit and your rules apply to every one of them.</p>
+        <p>Give Hermes, Claude Code or any MCP client a key to this wallet. Over MCP it can quote and pay paywalls; it can never move funds elsewhere, add money or change your rules. Keys are revocable, and your limits apply to every one of them.</p>
       </header>
 
       <Rise className="keys-grid">
-        <form className="rules-editor" onSubmit={create}>
-          <div className="rulecard">
-            <header>
-              <span>new key</span>
-              <em>{fresh ? "shown once, copy it now" : "read + pay is all an agent needs"}</em>
-            </header>
-            <div className="row field">
-              <div>
-                <span>Name</span>
-                <small>so you recognise it in the list</small>
+        <div className="keys-left">
+          <form className="rules-editor" onSubmit={create}>
+            <div className="rulecard">
+              <header>
+                <span>new key</span>
+                <em>{fresh ? "shown once, copy it now" : "read + pay is all an agent needs"}</em>
+              </header>
+              <div className="row field">
+                <div>
+                  <span>Name</span>
+                  <small>so you recognise it in the list</small>
+                </div>
+                <label className="key-name">
+                  <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} aria-label="key name" />
+                </label>
               </div>
-              <label className="key-name">
-                <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} aria-label="key name" />
-              </label>
-            </div>
-            <div className="row field">
-              <div>
-                <span>Scopes</span>
-                <small>what the agent may call</small>
+              <div className="row field">
+                <div>
+                  <span>Scopes</span>
+                  <small>what the agent may call</small>
+                </div>
+                <div className="chain-toggles">
+                  {SCOPES.map((s) => {
+                    const on = scopes.includes(s.id);
+                    return (
+                      <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : ""} onClick={() => setScopes(on ? scopes.filter((x) => x !== s.id) : [...scopes, s.id])}>
+                        {s.label}
+                        <small>{s.hint}</small>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="chain-toggles">
-                {SCOPES.map((s) => {
-                  const on = scopes.includes(s.id);
-                  return (
-                    <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : ""} onClick={() => setScopes(on ? scopes.filter((x) => x !== s.id) : [...scopes, s.id])}>
-                      {s.label}
-                      <small>{s.hint}</small>
-                    </button>
-                  );
-                })}
+              <div className="row save-row">
+                <ArrowFillButton as="button" type="submit" disabled={busy !== null || !name.trim() || scopes.length === 0} {...BTN}>
+                  {busy === "create" ? "Creating…" : "Create key"}
+                </ArrowFillButton>
               </div>
             </div>
-            <div className="row save-row">
-              <ArrowFillButton as="button" type="submit" disabled={busy !== null || !name.trim() || scopes.length === 0} {...BTN}>
-                {busy === "create" ? "Creating…" : "Create key"}
-              </ArrowFillButton>
-            </div>
-          </div>
-          {note && <p className="rule-note err">{note}</p>}
-        </form>
+            {note && <p className="rule-note err">{note}</p>}
+          </form>
+          {fresh && <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />}
+          <section className="keys-list">
+            <h2 className="section-title">Your keys</h2>
+            <dl className="accounts">
+              {keys === null && <div className="acct skeleton" />}
+              {keys?.length === 0 && <p className="muted">No keys yet.</p>}
+              {keys?.map((k) => (
+                <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
+                  <dt>
+                    {k.name}
+                    <small>
+                      created {timeAgo(k.createdAt)}
+                      {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
+                      {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
+                      {k.revokedAt ? " · revoked" : ""}
+                    </small>
+                  </dt>
+                  <dd className="mono">
+                    {k.scopes.map((s) => (
+                      <span key={s} className="chip-scope">
+                        {s}
+                      </span>
+                    ))}
+                    {!k.revokedAt && (
+                      <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
+                        {busy === k.id ? "revoking…" : "revoke"}
+                      </button>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
 
-        <aside className="snippets">
-          {fresh ? (
-            <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />
-          ) : (
-            <div className="prove">
-              <h3>How it connects.</h3>
-              <p>
-                The key goes into your agent's environment and the agent talks to this wallet over MCP at <code>/mcp</code>. It can quote and pay paywalls. It can never move funds elsewhere, add money or change your rules.
-              </p>
-              <a className="term-link ink" href="https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes" target="_blank" rel="noreferrer">
-                Hermes integration guide ↗
-              </a>
-            </div>
-          )}
+        <aside className="keys-right">
           <Connect kit={kit} token={token} />
         </aside>
       </Rise>
 
-      <Rise className="dash-section">
-        <h2 className="section-title">Your keys</h2>
-        <dl className="accounts">
-          {keys === null && <div className="acct skeleton" />}
-          {keys?.length === 0 && <p className="muted">No keys yet.</p>}
-          {keys?.map((k) => (
-            <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
-              <dt>
-                {k.name}
-                <small>
-                  created {timeAgo(k.createdAt)}
-                  {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
-                  {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
-                  {k.revokedAt ? " · revoked" : ""}
-                </small>
-              </dt>
-              <dd className="mono">
-                {k.scopes.map((s) => (
-                  <span key={s} className="chip-scope">
-                    {s}
-                  </span>
-                ))}
-                {!k.revokedAt && (
-                  <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
-                    {busy === k.id ? "revoking…" : "revoke"}
-                  </button>
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Rise>
     </>
   );
 }
@@ -179,7 +169,14 @@ function Connect({ kit, token }: { kit: ReturnType<typeof connectKit>; token: st
         </>
       )}
       {client === "Any MCP client" && <Code label="http" file="Streamable HTTP" text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />}
-      <figcaption>{client === "Hermes" ? "The same two files work for the hosted bot." : client === "Claude Code" ? "Claude Code can then quote and pay paywalls from this wallet." : "Send the key as a Bearer token on every request."}</figcaption>
+      <figcaption>
+        {client === "Hermes" && (
+          <a href="https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes" target="_blank" rel="noreferrer">
+            Integration guide ↗
+          </a>
+        )}
+        {client === "Hermes" ? "The same two files work for the hosted bot." : client === "Claude Code" ? "Claude Code can then quote and pay paywalls from this wallet." : "Send the key as a Bearer token on every request."}
+      </figcaption>
     </figure>
   );
 }

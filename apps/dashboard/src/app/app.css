@@ -1164,11 +1164,30 @@ h2.section-title:not(.section-head *) {
 }
 
 /* agents: keys + connect snippets */
+/* two equal columns that start on the same line: make a key (and see your keys) on the left, connect it on the right */
 .keys-grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
   align-items: start;
+}
+.keys-left {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.keys-right {
+  position: sticky;
+  top: 96px;
+}
+.keys-list .section-title {
+  margin-top: 12px;
+}
+.code figcaption a {
+  float: right;
+  margin-left: 16px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+  color: #ffffff;
 }
 .key-name input {
   width: 100%;
@@ -1182,11 +1201,6 @@ h2.section-title:not(.section-head *) {
 .key-name input:focus {
   border-color: var(--ink);
   outline: none;
-}
-.snippets {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
 }
 /* long code lines scroll inside their block instead of stretching the column */
 .keys-grid > * {
