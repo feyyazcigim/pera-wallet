@@ -26,7 +26,6 @@ h1 .line > span {
   background: var(--paper);
 }
 .app-nav .nav-inner {
-  background: rgb(255 255 255 / 0.92);
   max-width: 1120px;
   height: 60px;
   margin-top: 10px;
@@ -1433,9 +1432,9 @@ h2.section-title:not(.section-head *) {
     border: 1px solid var(--line);
     border-radius: 26px;
     overflow: hidden; /* the active tab's yellow line sits on the bar's own edge */
-    background: rgb(255 255 255 / 0.96);
-    -webkit-backdrop-filter: blur(22px) saturate(1.4);
-    backdrop-filter: blur(22px) saturate(1.4);
+    background: rgb(255 255 255 / 0.9);
+    -webkit-backdrop-filter: blur(44px);
+    backdrop-filter: blur(44px);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -18px rgb(0 0 0 / 0.3);
   }
   .app-tabs > div,
