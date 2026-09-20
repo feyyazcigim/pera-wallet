@@ -165,6 +165,8 @@ function DepositDetails({ open }: { open: boolean }) {
   );
 }
 
+const STAGES = ["Bank", "Anchor", "Vault", "Agent"];
+
 /** The landing page's flow scene, driven by real events: a deposit walks it, every settled payment fires a coin. */
 function LiveFlow() {
   const { events, balances, position, earnedUsdc, policy, onLive } = useApp();
@@ -180,6 +182,16 @@ function LiveFlow() {
   useEffect(() => {
     if (!playing.current) setStep(settled as FlowStep);
   }, [settled]);
+  // the tabs let you look at one stage of the route; the scene goes back to where the money really is on its own
+  const [peek, setPeek] = useState<FlowStep | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const look = (stage: string) => {
+    clearTimeout(peekTimer.current);
+    setPeek((STAGES.indexOf(stage) + 1) as FlowStep);
+    peekTimer.current = setTimeout(() => setPeek(null), 5000);
+  };
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
+  const shown = peek ?? step;
 
   const paid = useMemo(() => events.filter((e) => e.type === "x402.paid"), [events]);
   const services = useMemo(() => {
@@ -203,6 +215,8 @@ function LiveFlow() {
         }, ms),
       );
     const stop = onLive((e: PeraEvent) => {
+      clearTimeout(peekTimer.current);
+      setPeek(null);
       if (e.type === "onramp.started") {
         playing.current = true;
         setStep(0);
@@ -226,18 +240,20 @@ function LiveFlow() {
   }, [onLive]);
 
   const lastDeposit = events.find((e) => e.type === "onramp.completed");
+  const latest = events.find((e) => e.type !== "x402.402");
   const tryAmt = lastDeposit ? tryOf(lastDeposit) : null;
   return (
     <Rise className="stage dash-stage">
-      <div className="stage-bar">
-        <span />
-        <span />
-        <span />
-        <em>live · this moves when your money does</em>
+      <div className="stage-head">
+        <MagnetTabs slug="flow-stage" options={STAGES} activeTab={STAGES[Math.max(0, shown - 1)]} onSelect={look} />
+        <em>
+          <i className={peek === null ? "live-dot" : "live-dot off"} />
+          {peek !== null ? "looking at one stage · back to live in a moment" : latest ? `${describe(latest).label} · ${timeAgo(latest.ts)}` : "live · this moves when your money does"}
+        </em>
       </div>
       <FlowScene
         ref={ref}
-        step={step}
+        step={shown}
         command="pera onramp 3000"
         live={{
           quote: lastDeposit && tryAmt ? `₺${tryAmt.toLocaleString("en-US")} → ${usd(lastDeposit.amountUsdc ?? 0)}` : "TRY → USDC",

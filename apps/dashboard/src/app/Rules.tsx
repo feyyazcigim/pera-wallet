@@ -153,7 +153,7 @@ export function Rules() {
           <Account label="Smart account" hint="owned by your passkey · holds the agent's budget" value={me?.smartAccountId} href={me?.smartAccountUrl} />
           <Account label="Treasury" hint="receives USDC from the anchor · deposits into the vault" value={me?.treasuryPublicKey} href={me?.treasuryUrl} />
           <Account label="Agent float" hint="pays x402 paywalls · topped up under the daily limit" value={me?.agentPublicKey} href={me?.agentUrl} />
-          <Account label="Base wallet" hint="Privy wallet, gas sponsored · funded through Circle CCTP" value={me?.evmAddress} href={me?.evmUrl} />
+          <Account label="EVM wallet" hint="Privy wallet, gas sponsored · funded through Circle CCTP" value={me?.evmAddress} href={me?.evmUrl} />
         </dl>
       </Rise>
     </>

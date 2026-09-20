@@ -13,7 +13,7 @@ const PROVISION_STEPS = [
   { label: "Deploying your smart account", hint: "An OpenZeppelin account on Stellar, owned by your passkey." },
   { label: "Writing the agent's spending rule", hint: "A daily cap, enforced by the contract itself." },
   { label: "Opening treasury and agent accounts", hint: "Reserves and fees are sponsored, so you never hold XLM." },
-  { label: "Creating your Base wallet", hint: "For paywalls on other chains, through Circle CCTP." },
+  { label: "Creating your EVM wallet", hint: "For paywalls on other chains, through Circle CCTP." },
 ];
 const PAYS_FOR = ["LLM calls", "FX rates", "web search", "market data", "translations", "image generation", "cloud compute"];
 const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", fillTextColor: "#0a0a0a", hoverFillBgColor: "#ffd400", hoverFillTextColor: "#0a0a0a" };

@@ -17,8 +17,8 @@ const STEPS: { n: string; title: string; body: string; tag: string; Visual: () =
     body: "USDC is deposited into a yield vault automatically. Your balance never sits idle." },
   { n: "04", title: "Your agent pays its own way", tag: "x402 · Soroban", Visual: PaymentsVisual,
     body: "The agent settles API calls over x402, per request, inside the limits you set on-chain." },
-  { n: "05", title: "Any chain in, one vault", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
-    body: "Not only lira. USDC from other chains is burned there and minted natively on Stellar. It lands as the same USDC, in the same vault, under the same rules." },
+  { n: "05", title: "One vault, any chain out", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
+    body: "Lira comes in once and becomes USDC on Stellar. When a paywall lives on another chain, Circle CCTP burns that USDC on Stellar and mints it natively there. No bridges, no wrapped tokens, the same rules." },
 ];
 
 const DWELL = 6.5; // seconds per step before it moves on by itself
@@ -283,25 +283,30 @@ function PaymentsVisual() {
   );
 }
 
-/* 05 — every door leads to the same vault: anchor rail + CCTP rails converge on one USDC */
-// `live` is honest on purpose: flip a CCTP source to true once it works end to end.
-const SOURCES = [
-  { name: "Turkish bank", send: "TRY", via: "Stellar anchor · SEP-6", steps: ["transfer", "quote", "payout"], live: true },
-  { name: "Base", send: "USDC", via: "Circle CCTP · domain 6", steps: ["burn", "attest", "mint"], live: false },
-  { name: "Ethereum", send: "USDC", via: "Circle CCTP · domain 0", steps: ["burn", "attest", "mint"], live: false },
-  { name: "Arbitrum", send: "USDC", via: "Circle CCTP · domain 3", steps: ["burn", "attest", "mint"], live: false },
-  { name: "Solana", send: "USDC", via: "Circle CCTP · domain 5", steps: ["burn", "attest", "mint"], live: false },
+/* 05: lira comes in once and becomes USDC on Stellar; from there CCTP carries it out to whichever chain the paywall lives on */
+const INBOUND = { via: "Stellar anchor · SEP-6", steps: ["transfer", "quote", "payout"] };
+// `live` is honest on purpose: flip a destination to true once it works end to end.
+const DESTS = [
+  { name: "Base", via: "Circle CCTP · domain 6", live: false },
+  { name: "Ethereum", via: "Circle CCTP · domain 0", live: false },
+  { name: "Arbitrum", via: "Circle CCTP · domain 3", live: false },
+  { name: "Solana", via: "Circle CCTP · domain 5", live: false },
 ];
-const CH = { x0: 176, x1: 452, ty: 118, row: (i: number) => 38 + i * 40 };
-const chainPath = (y: number) => `M${CH.x0},${y} C${CH.x0 + 130},${y} ${CH.x1 - 130},${CH.ty} ${CH.x1},${CH.ty}`;
-function chainKeyframes(y: number) {
+const OUT_STEPS = ["burn", "attest", "mint"];
+const CH = { bankX: 24, bankW: 144, hubX: 238, hubW: 164, outX: 488, outW: 128, ty: 108, row: (i: number) => 36 + i * 48 };
+type Seg = { x0: number; y0: number; x1: number; y1: number };
+const IN_SEG: Seg = { x0: CH.bankX + CH.bankW, y0: CH.ty, x1: CH.hubX, y1: CH.ty };
+const outSeg = (i: number): Seg => ({ x0: CH.hubX + CH.hubW, y0: CH.ty, x1: CH.outX, y1: CH.row(i) });
+const bend = (g: Seg) => (g.x1 - g.x0) * 0.55;
+const segPath = (g: Seg) => `M${g.x0},${g.y0} C${g.x0 + bend(g)},${g.y0} ${g.x1 - bend(g)},${g.y1} ${g.x1},${g.y1}`;
+function segKeyframes(g: Seg) {
   const xs: number[] = [];
   const ys: number[] = [];
   for (let k = 0; k <= 14; k++) {
     const t = k / 14;
     const u = 1 - t;
-    xs.push(u * u * u * CH.x0 + 3 * u * u * t * (CH.x0 + 130) + 3 * u * t * t * (CH.x1 - 130) + t * t * t * CH.x1);
-    ys.push(u * u * u * y + 3 * u * u * t * y + 3 * u * t * t * CH.ty + t * t * t * CH.ty);
+    xs.push(u * u * u * g.x0 + 3 * u * u * t * (g.x0 + bend(g)) + 3 * u * t * t * (g.x1 - bend(g)) + t * t * t * g.x1);
+    ys.push(u * u * u * g.y0 + 3 * u * u * t * g.y0 + 3 * u * t * t * g.y1 + t * t * t * g.y1);
   }
   return { xs, ys };
 }
@@ -310,19 +315,24 @@ const MONO = "'JetBrains Mono', ui-monospace, monospace";
 function ChainsVisual() {
   const [tick, setTick] = useState(0);
   const { ref, inView } = useLoop(800, () => setTick((v) => v + 1));
-  const sel = Math.floor(tick / 4) % SOURCES.length; // 3 steps + a short hold per source
+  // one round = lira in (3 steps + hold), then USDC out to the next chain (3 steps + hold)
+  const round = Math.floor(tick / 8);
+  const sel = round % DESTS.length;
+  const outbound = tick % 8 >= 4;
   const step = tick % 4;
-  const src = SOURCES[sel];
-  const k = chainKeyframes(CH.row(sel));
+  const leg = outbound ? { via: DESTS[sel].via, steps: OUT_STEPS, live: DESTS[sel].live } : { ...INBOUND, live: true };
+  const k = segKeyframes(outbound ? outSeg(sel) : IN_SEG);
   return (
     <div className="v-chains" ref={ref}>
       <svg viewBox="0 0 640 236" width="100%" height="100%" aria-hidden="true">
-        {SOURCES.map((s, i) => (
-          <path key={s.name} d={chainPath(CH.row(i))} fill="none" stroke={i === sel ? "#0a0a0a" : "#dcdcdc"} strokeWidth={i === sel ? 1.6 : 1.2} strokeDasharray={i === sel ? undefined : "2 6"} strokeLinecap="round" />
-        ))}
+        <path d={segPath(IN_SEG)} fill="none" stroke={outbound ? "#dcdcdc" : "#0a0a0a"} strokeWidth={outbound ? 1.2 : 1.6} strokeDasharray={outbound ? "2 6" : undefined} strokeLinecap="round" />
+        {DESTS.map((d, i) => {
+          const on = outbound && i === sel;
+          return <path key={d.name} d={segPath(outSeg(i))} fill="none" stroke={on ? "#0a0a0a" : "#dcdcdc"} strokeWidth={on ? 1.6 : 1.2} strokeDasharray={on ? undefined : "2 6"} strokeLinecap="round" />;
+        })}
         {inView && (
           <motion.circle
-            key={sel}
+            key={`${round}-${outbound}`}
             r={5.5}
             fill="#ffd400"
             stroke="#0a0a0a"
@@ -332,44 +342,56 @@ function ChainsVisual() {
             transition={{ duration: 2.3, ease: "easeInOut", delay: 0.15 }}
           />
         )}
-        {SOURCES.map((s, i) => {
-          const on = i === sel;
-          const y = CH.row(i);
+
+        {/* where the money starts */}
+        <g transform={`translate(${CH.bankX},${CH.ty - 15})`}>
+          <motion.rect width={CH.bankW} height={30} rx={15} stroke={outbound ? "#e0e0e0" : "#0a0a0a"} strokeWidth={1.2} initial={false} animate={{ fill: outbound ? "#ffffff" : "#0a0a0a" }} transition={{ duration: 0.3 }} />
+          <text x={14} y={19.5} fontSize={12.5} fontWeight={700} fill={outbound ? "#0a0a0a" : "#ffffff"}>
+            Turkish bank
+          </text>
+          <text x={CH.bankW - 12} y={19} textAnchor="end" fontSize={9.5} fontFamily={MONO} fill={outbound ? "#9a9a9a" : "#ffd400"}>
+            TRY
+          </text>
+        </g>
+
+        {/* the one place it lives */}
+        <g transform={`translate(${CH.hubX},${CH.ty})`}>
+          <rect x={0} y={-24} width={CH.hubW} height={48} rx={24} fill="#ffd400" />
+          <text x={CH.hubW / 2} y={-2} textAnchor="middle" fontSize={15} fontWeight={700} fill="#0a0a0a">
+            USDC on Stellar
+          </text>
+          <text x={CH.hubW / 2} y={13} textAnchor="middle" fontSize={9.5} fontFamily={MONO} fill="#0a0a0a">
+            vault · your rules
+          </text>
+        </g>
+
+        {/* where it can go to pay */}
+        {DESTS.map((d, i) => {
+          const on = outbound && i === sel;
           return (
-            <g key={s.name} transform={`translate(24,${y - 15})`}>
-              <motion.rect width={152} height={30} rx={15} stroke={on ? "#0a0a0a" : "#e0e0e0"} strokeWidth={1.2} initial={false} animate={{ fill: on ? "#0a0a0a" : "#ffffff" }} transition={{ duration: 0.3 }} />
+            <g key={d.name} transform={`translate(${CH.outX},${CH.row(i) - 15})`}>
+              <motion.rect width={CH.outW} height={30} rx={15} stroke={on ? "#0a0a0a" : "#e0e0e0"} strokeWidth={1.2} initial={false} animate={{ fill: on ? "#0a0a0a" : "#ffffff" }} transition={{ duration: 0.3 }} />
               <text x={14} y={19.5} fontSize={12.5} fontWeight={700} fill={on ? "#ffffff" : "#0a0a0a"}>
-                {s.name}
+                {d.name}
               </text>
-              <text x={140} y={19} textAnchor="end" fontSize={9.5} fontFamily={MONO} fill={on ? "#ffd400" : "#9a9a9a"}>
-                {s.send}
+              <text x={CH.outW - 12} y={19} textAnchor="end" fontSize={9.5} fontFamily={MONO} fill={on ? "#ffd400" : "#9a9a9a"}>
+                USDC
               </text>
             </g>
           );
         })}
 
-        {/* the one destination */}
-        <g transform={`translate(${CH.x1},${CH.ty})`}>
-          <rect x={0} y={-24} width={164} height={48} rx={24} fill="#ffd400" />
-          <text x={82} y={-2} textAnchor="middle" fontSize={15} fontWeight={700} fill="#0a0a0a">
-            USDC on Stellar
-          </text>
-          <text x={82} y={13} textAnchor="middle" fontSize={9.5} fontFamily={MONO} fill="#0a0a0a">
-            → vault · same rules
-          </text>
-        </g>
-
-        {/* what happens on the way, for the selected source */}
-        <g transform="translate(534,190)" fontFamily={MONO} fontSize={10}>
+        {/* what happens on the leg that is moving */}
+        <g transform={`translate(${CH.hubX + CH.hubW / 2},184)`} fontFamily={MONO} fontSize={10}>
           <text textAnchor="middle" y={-6} fill="#6e6e6e">
-            {src.via}
-            {src.live ? "  · live" : "  · next"}
+            {leg.via}
+            {leg.live ? "  · live" : "  · next"}
           </text>
-          {src.steps.map((label, i) => {
+          {leg.steps.map((label, i) => {
             const active = step === i;
             const done = step > i;
             return (
-              <g key={`${sel}-${label}`} transform={`translate(${(i - 1) * 64 - 29},6)`}>
+              <g key={`${outbound}-${label}`} transform={`translate(${(i - 1) * 64 - 29},6)`}>
                 <motion.rect width={58} height={22} rx={11} stroke={active || done ? "#0a0a0a" : "#dcdcdc"} strokeWidth={1} initial={false} animate={{ fill: active ? "#ffd400" : "#ffffff" }} transition={{ duration: 0.25 }} />
                 <text x={29} y={14.5} textAnchor="middle" fill={active || done ? "#0a0a0a" : "#a5a5a5"}>
                   {label}
