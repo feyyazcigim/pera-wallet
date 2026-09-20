@@ -148,7 +148,9 @@ export const demoBackend: Backend = {
   },
   async policy() {
     const used = usedToday();
-    return { capUsdc: state.cap, usedUsdc: used, remainingUsdc: Math.max(0, state.cap - used), windowLedgers: 17280, transfers: state.spends.length, policyUrl: null };
+    const week = paidThisWeek();
+    const weekly = state.weeklyCap === null ? null : { capUsdc: state.weeklyCap, usedUsdc: week.spentThisWeekUsdc, remainingUsdc: Math.max(0, state.weeklyCap - week.spentThisWeekUsdc), transfers: week.paymentsThisWeek, policyUrl: null };
+    return { capUsdc: state.cap, usedUsdc: used, remainingUsdc: Math.max(0, state.cap - used), windowLedgers: 17280, transfers: state.spends.length, policyUrl: null, weekly };
   },
   async rules() {
     return { weeklyCapUsdc: state.weeklyCap, maxPerCallUsdc: state.maxPerCall, allowedNetworks: state.networks, ...paidThisWeek() };
@@ -224,14 +226,15 @@ export const demoBackend: Backend = {
   async cliToken() {
     return "ps_demo-token-not-real";
   },
-  async setCap(capUsdc, _me, rules) {
+  async setCap(capUsdc, _me, rules, window = "daily") {
     await wait(1400); // stands in for the passkey prompt + sponsored submit
-    state.cap = capUsdc;
+    if (window === "weekly") state.weeklyCap = capUsdc;
+    else state.cap = capUsdc;
     if (rules) {
       state.weeklyCap = rules.weeklyCapUsdc;
       state.maxPerCall = rules.maxPerCallUsdc;
       state.networks = rules.allowedNetworks;
     }
-    emit("agent.authorized", capUsdc, { rule: 1, change: "cap" });
+    emit("agent.authorized", capUsdc, { rule: 1, change: window === "weekly" ? "weekly cap" : "cap" });
   },
 };

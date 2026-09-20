@@ -1,6 +1,7 @@
-import { addUsdc, childLogger, events, loadEnv, maxUsdc, SMART_ACCOUNT, sponsorPublicKey, stellarContractUrl, stellarTxUrl, usdcToKitNumber, USDC_SAC, withAccountLock, type UserWalletContext } from "@pera/core";
+import { addUsdc, childLogger, cmpUsdc, events, loadEnv, maxUsdc, SMART_ACCOUNT, sponsorPublicKey, stellarContractUrl, stellarTxUrl, usdcToKitNumber, USDC_SAC, withAccountLock, type UserWalletContext } from "@pera/core";
 import { decodeKitError, SmartAccountOpError, SpendingCapExceededError } from "./errors";
 import { getKitFor, selectSigners } from "./kit";
+import { getPolicyUsage } from "./policy";
 import { getRule } from "./rules";
 
 const log = childLogger("smart-account.float");
@@ -46,15 +47,20 @@ export async function topUpFloat(ctx: FloatCtx, p: { amountUsdc: string; ruleId?
     } catch (err) {
       const decoded = decodeKitError(err);
       if (decoded.code === SMART_ACCOUNT.errors.SpendingLimitExceeded) {
+        // daily and weekly are the same wasm and reject with the same code; the live windows tell them apart
+        const usage = await getPolicyUsage(ctx, ruleId).catch(() => null);
+        const weekly = usage?.weekly ?? null;
+        const byWeekly = !!weekly && cmpUsdc(p.amountUsdc, weekly.remainingUsdc) > 0 && cmpUsdc(p.amountUsdc, usage!.remainingUsdc) <= 0;
+        const policy = byWeekly ? SMART_ACCOUNT.weeklySpendingLimitPolicy : SMART_ACCOUNT.spendingLimitPolicy;
         events.emit({
           type: "float.topup.rejected",
           userId: ctx.userId,
           amountUsdc: p.amountUsdc,
           network: "stellar:testnet",
-          explorerUrl: stellarContractUrl(SMART_ACCOUNT.spendingLimitPolicy),
-          detail: { ruleId, errorCode: decoded.code, errorName: "SpendingLimitExceeded", dailyCapUsdc: ctx.dailyCapUsdc },
+          explorerUrl: stellarContractUrl(policy),
+          detail: { ruleId, errorCode: decoded.code, errorName: "SpendingLimitExceeded", window: byWeekly ? "weekly" : "daily", dailyCapUsdc: usage?.dailyCapUsdc ?? ctx.dailyCapUsdc, weeklyCapUsdc: weekly?.capUsdc ?? null },
         });
-        throw new SpendingCapExceededError(p.amountUsdc, ctx.dailyCapUsdc, decoded.message);
+        throw new SpendingCapExceededError(p.amountUsdc, usage?.dailyCapUsdc ?? ctx.dailyCapUsdc, decoded.message, byWeekly ? "weekly" : "daily", weekly?.capUsdc ?? null);
       }
       if (err instanceof SmartAccountOpError) throw err;
       throw new SmartAccountOpError(`top-up failed: ${decoded.message}`, decoded);
@@ -66,6 +72,8 @@ export interface OverCapResult {
   rejected: true;
   attemptedUsdc: string;
   dailyCapUsdc: string;
+  window: "daily" | "weekly";
+  weeklyCapUsdc: string | null;
   errorCode: number;
   errorName: string;
   policyContract: string;
@@ -86,18 +94,22 @@ export async function attemptOverCap(ctx: FloatCtx, p: { amountUsdc?: string; ru
     throw new Error(`POLICY_NOT_ENFORCED: over-cap transfer of ${attempt} USDC succeeded (${ok.txHash})`);
   } catch (err) {
     if (!(err instanceof SpendingCapExceededError)) throw err;
+    const weekly = err.window === "weekly";
+    const policy = weekly ? SMART_ACCOUNT.weeklySpendingLimitPolicy : SMART_ACCOUNT.spendingLimitPolicy;
     return {
       rejected: true,
       attemptedUsdc: attempt,
-      dailyCapUsdc: cap,
+      dailyCapUsdc: err.dailyCapUsdc,
+      window: err.window,
+      weeklyCapUsdc: err.weeklyCapUsdc,
       errorCode: err.code,
       errorName: err.errorName,
-      policyContract: SMART_ACCOUNT.spendingLimitPolicy,
-      policyExplorerUrl: stellarContractUrl(SMART_ACCOUNT.spendingLimitPolicy),
+      policyContract: policy,
+      policyExplorerUrl: stellarContractUrl(policy),
       smartAccountId: ctx.smartAccountId,
       ruleId,
       simulationError: err.raw,
-      explanation: `The OpenZeppelin spending_limit policy attached to context rule ${ruleId} rejected a ${attempt} USDC transfer because it exceeds the ${cap} USDC rolling 24h cap. The agent key cannot bypass this: the check runs inside the smart account's __check_auth on-chain.`,
+      explanation: `The OpenZeppelin spending_limit policy attached to context rule ${ruleId} rejected a ${attempt} USDC transfer because it exceeds the ${weekly ? `${err.weeklyCapUsdc} USDC rolling 7 day` : `${err.dailyCapUsdc} USDC rolling 24h`} cap. The agent key cannot bypass this: the check runs inside the smart account's __check_auth on-chain.`,
     };
   }
 }

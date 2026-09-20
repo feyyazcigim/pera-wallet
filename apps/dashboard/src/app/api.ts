@@ -30,6 +30,7 @@ type WirePosition = { vaultId: string; underlyingUsdc: string; apy: number | nul
 type WirePolicy = {
   dailyCapUsdc: string; usedInWindowUsdc: string; remainingUsdc: string; periodLedgers: number; transfersInWindow: number;
   policyContract: string; policyExplorerUrl: string; authorised?: boolean;
+  weekly?: { capUsdc: string; usedInWindowUsdc: string; remainingUsdc: string; transfersInWindow: number; policyExplorerUrl: string } | null;
 };
 type WireRules = { weeklyCapUsdc: string | null; maxPerCallUsdc: string | null; allowedNetworks: string[]; spentThisWeekUsdc: string; paymentsThisWeek: number };
 type WireEvent = { id: string; ts: string; type: string; amountUsdc?: string | null; network?: string | null; txHash?: string | null; explorerUrl?: string | null; detail?: Record<string, unknown> | null };
@@ -47,7 +48,10 @@ export type Me = {
 };
 export type Balances = { treasury: number; float: number; smartAccount: number; vault: number; base: number; total: number };
 export type Position = { valueUsdc: number; apy: number | null; vaultId: string | null; explorerUrl: string | null };
-export type Policy = { capUsdc: number; usedUsdc: number; remainingUsdc: number; windowLedgers: number; transfers: number; policyUrl: string | null };
+/** One on-chain spending window. */
+export type CapWindow = { capUsdc: number; usedUsdc: number; remainingUsdc: number; transfers: number; policyUrl: string | null };
+/** The daily window, plus the weekly one when the agent's rule carries it (null on rules created before it existed). */
+export type Policy = CapWindow & { windowLedgers: number; weekly: CapWindow | null };
 export const NETWORKS = [
   { id: "stellar:testnet", label: "Stellar", hint: "native x402" },
   { id: "eip155:84532", label: "Base", hint: "via Circle CCTP" },
@@ -93,7 +97,8 @@ export interface Backend {
   pay(url: string, prefer?: PayPrefer): Promise<PayResult>;
   overCapDemo(): Promise<string>; // → the chain's rejection, explained
   /** Daily cap (on-chain). Pass `rules` to change the router rules under the same single passkey prompt. */
-  setCap(capUsdc: number, me: Me, rules?: RulesInput): Promise<void>;
+  /** A contract change, signed by the passkey. `window` picks the policy: the daily one or the weekly one. */
+  setCap(capUsdc: number, me: Me, rules?: RulesInput, window?: "daily" | "weekly"): Promise<void>;
   /** The IBAN + reference that route a bank transfer to this user (a fresh reference once the last one is used). */
   depositDetails(): Promise<DepositDetails>;
   /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
@@ -255,7 +260,8 @@ const httpBackend: Backend = {
   },
   async policy() {
     const p = await http<WirePolicy>("/agent/policy");
-    return { capUsdc: usdc(p.dailyCapUsdc), usedUsdc: usdc(p.usedInWindowUsdc), remainingUsdc: usdc(p.remainingUsdc), windowLedgers: p.periodLedgers, transfers: p.transfersInWindow, policyUrl: p.policyExplorerUrl };
+    const weekly = p.weekly ? { capUsdc: usdc(p.weekly.capUsdc), usedUsdc: usdc(p.weekly.usedInWindowUsdc), remainingUsdc: usdc(p.weekly.remainingUsdc), transfers: p.weekly.transfersInWindow, policyUrl: p.weekly.policyExplorerUrl } : null;
+    return { capUsdc: usdc(p.dailyCapUsdc), usedUsdc: usdc(p.usedInWindowUsdc), remainingUsdc: usdc(p.remainingUsdc), windowLedgers: p.periodLedgers, transfers: p.transfersInWindow, policyUrl: p.policyExplorerUrl, weekly };
   },
   rules: async () => normRules(await http<WireRules>("/agent/rules")),
   async setRules(input) {
@@ -294,13 +300,13 @@ const httpBackend: Backend = {
   depositDetails: async () => http<DepositDetails>("/onramp/instructions", { body: {} }),
   cliToken: async () => (await http<{ token: string }>("/cli/token", { body: {} })).token,
   // guide §5.7 — build → passkey signs in the browser (kit.signAdmin) → API submits it sponsored
-  async setCap(capUsdc, me, rules) {
+  async setCap(capUsdc, me, rules, window = "daily") {
     if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up. Try again in a moment.");
-    const dailyCapUsdc = dec(capUsdc, 7);
-    const build = await http<{ json: string }>("/agent/policy/build", { body: { dailyCapUsdc } });
-    const { signExecuteWithPasskey } = await import("./kit"); // heavy (stellar-sdk + kit): only loaded here
-    const xdr = await signExecuteWithPasskey({ contractId: me.smartAccountId, credentialId: me.credentialId, publicKeyB64u: me.passkeyPublicKey }, build.json);
-    await http("/agent/policy", { body: { xdr, dailyCapUsdc, rules: rules ? wireRules(rules) : undefined } });
+    const cap = window === "weekly" ? { weeklyCapUsdc: dec(capUsdc, 7) } : { dailyCapUsdc: dec(capUsdc, 7) };
+    const build = await http<{ json: string; method: "set_spending_limit" | "add_policy" }>("/agent/policy/build", { body: cap });
+    const { signWithPasskey } = await import("./kit"); // heavy (stellar-sdk + kit): only loaded here
+    const xdr = await signWithPasskey({ contractId: me.smartAccountId, credentialId: me.credentialId, publicKeyB64u: me.passkeyPublicKey }, build.json, build.method === "add_policy" ? "add_policy" : "execute");
+    await http("/agent/policy", { body: { xdr, ...cap, rules: rules ? wireRules(rules) : undefined } });
   },
 };
 

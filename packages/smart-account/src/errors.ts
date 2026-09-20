@@ -29,8 +29,15 @@ export class SpendingCapExceededError extends Error {
     readonly attemptedUsdc: string,
     readonly dailyCapUsdc: string,
     readonly raw: string,
+    /** Which on-chain window said no. Both are spending_limit instances, so both answer with #3221. */
+    readonly window: "daily" | "weekly" = "daily",
+    readonly weeklyCapUsdc: string | null = null,
   ) {
-    super(`spending cap exceeded: attempted ${attemptedUsdc} USDC against a ${dailyCapUsdc} USDC rolling daily cap (policy error #${SMART_ACCOUNT.errors.SpendingLimitExceeded} SpendingLimitExceeded)`);
+    super(
+      window === "weekly"
+        ? `spending cap exceeded: attempted ${attemptedUsdc} USDC against a ${weeklyCapUsdc} USDC rolling weekly cap (policy error #${SMART_ACCOUNT.errors.SpendingLimitExceeded} SpendingLimitExceeded)`
+        : `spending cap exceeded: attempted ${attemptedUsdc} USDC against a ${dailyCapUsdc} USDC rolling daily cap (policy error #${SMART_ACCOUNT.errors.SpendingLimitExceeded} SpendingLimitExceeded)`,
+    );
     this.name = "SpendingCapExceededError";
   }
 }

@@ -196,6 +196,16 @@ components:
       required:
         - dailyCapUsdc
       additionalProperties: false
+    CapBody:
+      type: object
+      properties:
+        dailyCapUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+        weeklyCapUsdc:
+          type: string
+          pattern: ^\d+(\.\d{1,7})?$
+      additionalProperties: false
     RulesBody:
       type: object
       properties:
@@ -587,7 +597,7 @@ paths:
               $ref: "#/components/schemas/XdrBody"
       responses:
         "200":
-          description: "{ ruleId, txHash, dailyCapUsdc }"
+          description: "{ ruleId, txHash, dailyCapUsdc?, weeklyCapUsdc?, rules? }"
           content:
             application/json:
               schema:
@@ -695,18 +705,20 @@ paths:
         "400": *a1
   /agent/policy/build:
     post:
-      summary: Build set_spending_limit for passkey signing
-        (kit.wallet.fromJSON.execute → kit.signAdmin)
+      summary: "Build a cap change for passkey signing: daily or weekly window.
+        method=set_spending_limit → kit.wallet.fromJSON.execute,
+        method=add_policy (weekly window on an older rule) →
+        fromJSON.add_policy; then kit.signAdmin"
       security: *a2
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PolicyBody"
+              $ref: "#/components/schemas/CapBody"
       responses:
         "200":
-          description: "{ json, xdr, ruleId, dailyCapUsdc }"
+          description: "{ json, xdr, ruleId, window, method, dailyCapUsdc | weeklyCapUsdc }"
           content:
             application/json:
               schema:

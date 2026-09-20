@@ -34,9 +34,15 @@ export const SMART_ACCOUNT = {
   webauthnVerifier: "CC7EKIHQP3TN4CARQDND6CEOY2UXLWWC2X5GHTD5NLAT7BG5GPZIOM3F",
   ed25519Verifier: "CAAVTMCBXEIBPR64EAASKFXERVPYFZA2JYP5A3BG6PESWEFUJX5IHKN4",
   spendingLimitPolicy: "CABXBYJNZ7IUW4G3D6BND5YCAQF3ASSDMDAOKQQ63UYFSO7WUU2TIP5G",
+  /**
+   * Second instance of the same spending_limit wasm (scripts/deploy-weekly-policy.ts). A rule's policies are keyed
+   * by contract address and each instance keeps one window per (account, rule), so the weekly window needs its own.
+   */
+  weeklySpendingLimitPolicy: "CDPNKQFBURV7ZAYWXQTVOWH2BXNCIRZRYTFSQFYG7BTN7EV5QRTUHJ3D",
   thresholdPolicy: "CB3FATQKCIRIQOCYRUPCQ2KREQ7T4RPKS7EAEOZWPEPUKWEDRVROBCEG",
   /** ~5 s ledgers → 17 280 per day; the spending_limit period is expressed in ledgers. */
   ledgersPerDay: 17_280,
+  ledgersPerWeek: 120_960,
   /** spending_limit policy error codes (OpenZeppelin stellar-contracts). */
   errors: { SpendingLimitExceeded: 3221, NotAllowed: 3223 },
 } as const;

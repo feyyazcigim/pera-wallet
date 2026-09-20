@@ -385,7 +385,7 @@ function Budget({ pending }: { pending: PeraEvent[] }) {
       </div>
       <div className="row">
         <span>Weekly limit</span>
-        <b>{rules ? `${usd(rules.spentThisWeekUsdc)} / ${rules.weeklyCapUsdc === null ? "no limit" : usd(rules.weeklyCapUsdc)}` : "-"}</b>
+        <b>{policy?.weekly ? `${usd(policy.weekly.usedUsdc)} / ${usd(policy.weekly.capUsdc)}` : rules ? `${usd(rules.spentThisWeekUsdc)} / ${rules.weeklyCapUsdc === null ? "no limit" : usd(rules.weeklyCapUsdc)}` : "-"}</b>
       </div>
       <div className="row">
         <span>Max per call</span>

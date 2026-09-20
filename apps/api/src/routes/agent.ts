@@ -2,13 +2,13 @@ import type { FastifyInstance } from "fastify";
 import { events, stellarTxUrl } from "@pera/core";
 import { consumeChallenge, createChallenge, getAgentRules, getPasskey, listPaidAmountsSince, touchPasskey, updateStellarWallet, upsertAgentRules } from "@pera/db";
 import { verifyAssertion } from "@pera/passkey";
-import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, getPolicyUsage, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME } from "@pera/smart-account";
+import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, buildSetWeeklyCapTx, getPolicyUsage, getRule, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME } from "@pera/smart-account";
 import { transferUsdcFrom } from "@pera/evm";
 import { ensureSmartAccountBalance, payFor, RuleViolationError } from "@pera/x402-router";
-import { addUsdc, cmpUsdc, loadEnv } from "@pera/core";
+import { addUsdc, cmpUsdc, loadEnv, maxUsdc, SMART_ACCOUNT } from "@pera/core";
 import { requireUser } from "../auth";
 import { loadContext } from "../context";
-import { AuthorizeBuildBody, EvmTransferBody, PayBody, PolicyBody, RulesApprovalBody, RulesBody, XdrBody } from "../schemas";
+import { AuthorizeBuildBody, CapBody, DecimalUsdc, EvmTransferBody, PayBody, RulesApprovalBody, RulesBody, XdrBody } from "../schemas";
 
 /** Collects the events emitted for this user during `fn` (returned as `timeline`). */
 async function withTimeline<T>(userId: string, fn: () => Promise<T>): Promise<T & { timeline: unknown[] }> {
@@ -40,7 +40,8 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     const ctx = await loadContext(requireUser(req).id);
     const { dailyCapUsdc } = AuthorizeBuildBody.parse(req.body ?? {});
     const cap = dailyCapUsdc ?? ctx.dailyCapUsdc;
-    const { tx } = await buildAgentRuleTx(ctx, { agentPublicKey: ctx.agentPub, capUsdc: cap });
+    const weeklyCapUsdc = (await getAgentRules(ctx.userId)).weeklyCapUsdc ?? maxUsdc(loadEnv().AGENT_WEEKLY_CAP_USDC, cap);
+    const { tx } = await buildAgentRuleTx(ctx, { agentPublicKey: ctx.agentPub, capUsdc: cap, weeklyCapUsdc });
     if (dailyCapUsdc && dailyCapUsdc !== ctx.dailyCapUsdc) await updateStellarWallet(ctx.userId, { dailyCapUsdc });
     return { json: tx.toJSON(), xdr: tx.toXDR(), agentPublicKey: ctx.agentPub, dailyCapUsdc: cap, ruleName: AGENT_RULE_NAME, smartAccountId: ctx.smartAccountId };
   });
@@ -59,19 +60,26 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
   /** Cap change, same two-step passkey flow. */
   app.post("/agent/policy/build", async (req) => {
     const ctx = await loadContext(requireUser(req).id);
-    const { dailyCapUsdc } = PolicyBody.parse(req.body);
+    const { dailyCapUsdc, weeklyCapUsdc } = CapBody.parse(req.body);
     if (ctx.agentRuleId === undefined) throw Object.assign(new Error("agent not authorised yet"), { statusCode: 409, code: "NOT_AUTHORISED" });
-    const { tx } = await buildSetCapTx(ctx, { ruleId: ctx.agentRuleId, dailyCapUsdc });
-    return { json: tx.toJSON(), xdr: tx.toXDR(), ruleId: ctx.agentRuleId, dailyCapUsdc };
+    if (weeklyCapUsdc !== undefined) {
+      // `method` tells the browser which smart-account call to rebuild: add_policy for rules created before the weekly window
+      const { tx, method } = await buildSetWeeklyCapTx(ctx, { ruleId: ctx.agentRuleId, weeklyCapUsdc });
+      return { json: tx.toJSON(), xdr: tx.toXDR(), ruleId: ctx.agentRuleId, weeklyCapUsdc, window: "weekly" as const, method };
+    }
+    const { tx } = await buildSetCapTx(ctx, { ruleId: ctx.agentRuleId, dailyCapUsdc: dailyCapUsdc! });
+    return { json: tx.toJSON(), xdr: tx.toXDR(), ruleId: ctx.agentRuleId, dailyCapUsdc, window: "daily" as const, method: "set_spending_limit" as const };
   });
   app.post("/agent/policy", async (req) => {
     const ctx = await loadContext(requireUser(req).id);
-    const { xdr, dailyCapUsdc, rules } = XdrBody.extend({ dailyCapUsdc: PolicyBody.shape.dailyCapUsdc, rules: RulesBody.optional() }).parse(req.body);
+    const { xdr, dailyCapUsdc, weeklyCapUsdc, rules } = XdrBody.extend({ dailyCapUsdc: DecimalUsdc.optional(), weeklyCapUsdc: DecimalUsdc.optional(), rules: RulesBody.optional() }).parse(req.body);
     const r = await submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
-    await updateStellarWallet(ctx.userId, { dailyCapUsdc });
+    if (dailyCapUsdc) await updateStellarWallet(ctx.userId, { dailyCapUsdc });
     // the transaction above only lands if the owner's passkey signed it, so it also approves the router rules sent with it
     if (rules) await upsertAgentRules(ctx.userId, rules);
-    return { ruleId: ctx.agentRuleId, txHash: r.hash, explorerUrl: r.explorerUrl, dailyCapUsdc, rules: rules ? await getAgentRules(ctx.userId) : undefined };
+    // keep the router's copy of the weekly limit equal to what the contract now enforces
+    if (weeklyCapUsdc) await upsertAgentRules(ctx.userId, { ...(await getAgentRules(ctx.userId)), weeklyCapUsdc });
+    return { ruleId: ctx.agentRuleId, txHash: r.hash, explorerUrl: r.explorerUrl, dailyCapUsdc, weeklyCapUsdc, rules: rules || weeklyCapUsdc ? await getAgentRules(ctx.userId) : undefined };
   });
 
   /** Generic sponsored submission of any passkey-signed transaction targeting the user's smart account. */
@@ -99,6 +107,10 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     const env = loadEnv();
     const ctx = await loadContext(requireUser(req).id);
     const rules = RulesBody.parse(req.body);
+    // once the weekly window lives in the contract it only moves with a passkey-signed transaction (/agent/policy)
+    if (ctx.agentRuleId !== undefined && rules.weeklyCapUsdc !== (await getAgentRules(ctx.userId)).weeklyCapUsdc && (await getRule(ctx, ctx.agentRuleId)).policies.includes(SMART_ACCOUNT.weeklySpendingLimitPolicy)) {
+      throw Object.assign(new Error("the weekly limit is enforced by the contract; change it through /agent/policy"), { statusCode: 409, code: "WEEKLY_ON_CHAIN" });
+    }
     const challenge = await createChallenge({ purpose: "rules", credentialId: ctx.credentialId, payload: JSON.stringify(rules) });
     return { challenge, rpId: env.PASSKEY_RP_ID, userVerification: "required", allowCredentials: [{ id: ctx.credentialId, type: "public-key" }], timeout: 60_000, rules };
   });

@@ -10,7 +10,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((err: Error & { statusCode?: number; code?: string | number }, _req, reply) => {
     if (err instanceof ZodError) return reply.status(400).send({ error: "invalid request body", code: "BAD_REQUEST", detail: err.issues });
     if (err instanceof SpendingCapExceededError) {
-      return reply.status(409).send({ error: err.message, code: "SPENDING_CAP_EXCEEDED", errorCode: err.code, detail: { attemptedUsdc: err.attemptedUsdc, dailyCapUsdc: err.dailyCapUsdc, errorName: err.errorName, raw: err.raw } });
+      return reply.status(409).send({ error: err.message, code: "SPENDING_CAP_EXCEEDED", errorCode: err.code, detail: { attemptedUsdc: err.attemptedUsdc, dailyCapUsdc: err.dailyCapUsdc, window: err.window, weeklyCapUsdc: err.weeklyCapUsdc, errorName: err.errorName, raw: err.raw } });
     }
     if (err instanceof RuleViolationError) return reply.status(409).send({ error: err.message, code: "RULE_VIOLATION", detail: { rule: err.rule, ...err.detail } });
     if (err instanceof SmartAccountOpError) return reply.status(502).send({ error: err.message, code: "SMART_ACCOUNT_ERROR", errorCode: err.decoded.code ?? undefined, detail: err.decoded });

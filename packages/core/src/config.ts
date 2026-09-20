@@ -29,6 +29,7 @@ export const EnvSchema = z.object({
   VAULT_ID: opt(ContractId),
 
   AGENT_DAILY_CAP_USDC: DecimalUsdc.default("10"),
+  AGENT_WEEKLY_CAP_USDC: DecimalUsdc.default("50"),
   YIELD_RESERVE_USDC: DecimalUsdc.default("5"),
   BOOTSTRAP_ONRAMP_TRY: z.string().regex(/^\d+(\.\d{1,2})?$/).default("3000"),
   AUTOPILOT: z.enum(["on", "off"]).default("on"),

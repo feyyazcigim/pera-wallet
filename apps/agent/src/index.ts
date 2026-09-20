@@ -148,18 +148,21 @@ program
 program
   .command("set-cap")
   .argument("<usdc>")
-  .description("owner changes the agent's daily cap (passkey-signed, sponsored)")
-  .action(async (cap: string) => {
+  .option("--weekly", "change the weekly window instead of the daily one")
+  .description("owner changes the agent's daily (or weekly) cap (passkey-signed, sponsored)")
+  .action(async (cap: string, opts: { weekly?: boolean }) => {
     try {
       const { passkey, record } = devicePasskey();
       const client = api();
-      const build = await client.post<{ json: string; ruleId: number }>("/agent/policy/build", { dailyCapUsdc: cap });
+      const body = opts.weekly ? { weeklyCapUsdc: cap } : { dailyCapUsdc: cap };
+      const build = await client.post<{ json: string; ruleId: number; method: "set_spending_limit" | "add_policy" }>("/agent/policy/build", body);
       const kit = browserLikeKit(passkey);
       await attachDevice(kit, passkey, record);
-      const tx = kit.wallet!.fromJSON.execute(build.json);
+      // a rule created before the weekly window existed gets the policy attached (add_policy) instead of updated
+      const tx = build.method === "add_policy" ? kit.wallet!.fromJSON.add_policy(build.json) : kit.wallet!.fromJSON.execute(build.json);
       const signed = await kit.signAdmin(tx, { resolveContextRuleIds: () => [0] });
-      const r = await client.post<{ txHash: string; explorerUrl: string }>("/agent/policy", { xdr: signed.toXDR(), dailyCapUsdc: cap });
-      console.log(`✔ cap set to ${cap} USDC — ${r.explorerUrl}`);
+      const r = await client.post<{ txHash: string; explorerUrl: string }>("/agent/policy", { xdr: signed.toXDR(), ...body });
+      console.log(`✔ ${opts.weekly ? "weekly" : "daily"} cap set to ${cap} USDC — ${r.explorerUrl}`);
     } catch (err) {
       fail(err);
     }

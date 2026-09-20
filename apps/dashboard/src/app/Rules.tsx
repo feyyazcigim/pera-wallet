@@ -21,7 +21,7 @@ export function Rules() {
   const saved = useMemo<Form | null>(
     () =>
       policy && rules
-        ? { daily: String(policy.capUsdc), weekly: rules.weeklyCapUsdc === null ? "" : String(rules.weeklyCapUsdc), perCall: rules.maxPerCallUsdc === null ? "" : String(rules.maxPerCallUsdc), chains: rules.allowedNetworks }
+        ? { daily: String(policy.capUsdc), weekly: policy.weekly ? String(policy.weekly.capUsdc) : rules.weeklyCapUsdc === null ? "" : String(rules.weeklyCapUsdc), perCall: rules.maxPerCallUsdc === null ? "" : String(rules.maxPerCallUsdc), chains: rules.allowedNetworks }
         : null,
     [policy, rules],
   );
@@ -34,7 +34,10 @@ export function Rules() {
 
   const dirty = Boolean(form && saved && !same(form, saved));
   const dailyChanged = Boolean(form && saved && num(form.daily) !== num(saved.daily));
-  const valid = Boolean(form && (num(form.daily) ?? 0) > 0 && form.chains.length > 0 && [form.weekly, form.perCall].every((v) => v.trim() === "" || (num(v) ?? 0) > 0));
+  const weeklyChanged = Boolean(form && saved && num(form.weekly) !== num(saved.weekly));
+  // the weekly limit is a contract policy: it can move, but once it is there it cannot be blank
+  const weeklyOk = Boolean(form && ((num(form.weekly) ?? 0) > 0 || (form.weekly.trim() === "" && !weeklyChanged)));
+  const valid = Boolean(form && (num(form.daily) ?? 0) > 0 && weeklyOk && form.chains.length > 0 && (form.perCall.trim() === "" || (num(form.perCall) ?? 0) > 0));
   const preset = form ? (Object.keys(PRESETS).find((k) => same(PRESETS[k], form)) ?? "Custom") : "Custom";
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const hours = policy ? Math.round((policy.windowLedgers * 5) / 3600) : 24;
@@ -45,15 +48,18 @@ export function Rules() {
     setBusy("save");
     setNote(null);
     try {
-      // every change is approved by the owner's passkey, exactly once:
-      // a daily-limit change is a signed on-chain transaction (it carries the other rules with it); otherwise the passkey signs the new ruleset itself
-      const router = { weeklyCapUsdc: num(form.weekly), maxPerCallUsdc: num(form.perCall), allowedNetworks: form.chains };
-      const routerChanged = !same({ ...form, daily: saved.daily }, saved);
-      if (dailyChanged) await api().setCap(num(form.daily)!, me, routerChanged ? router : undefined);
-      else await api().setRules(router);
+      // every change is approved by the owner's passkey. Daily and weekly limits are each a signed on-chain transaction
+      // (the first one carries the router rules with it); with neither, the passkey signs the new ruleset itself.
+      // The router's copy of the weekly limit only follows the contract, so it rides along unchanged here.
+      const router = { weeklyCapUsdc: num(saved.weekly), maxPerCallUsdc: num(form.perCall), allowedNetworks: form.chains };
+      const routerChanged = !same({ ...form, daily: saved.daily, weekly: saved.weekly }, saved);
+      if (dailyChanged) await api().setCap(num(form.daily)!, me, routerChanged ? router : undefined, "daily");
+      if (weeklyChanged) await api().setCap(num(form.weekly)!, me, routerChanged && !dailyChanged ? router : undefined, "weekly");
+      if (!dailyChanged && !weeklyChanged) await api().setRules(router);
       await refresh();
       setForm(null);
-      setNote({ ok: true, text: dailyChanged ? "Saved with your passkey. The new daily limit is written to the policy contract, and the router enforces the rest from now on." : "Saved with your passkey. The router enforces these on the agent's next payment." });
+      const onchain = dailyChanged && weeklyChanged ? "daily and weekly limits are" : dailyChanged ? "daily limit is" : "weekly limit is";
+      setNote({ ok: true, text: dailyChanged || weeklyChanged ? `Saved with your passkey. The new ${onchain} written to the policy contract, and the router enforces the rest from now on.` : "Saved with your passkey. The router enforces these on the agent's next payment." });
     } catch (err) {
       await refresh();
       setNote({ ok: false, text: err instanceof Error ? err.message : String(err) });
@@ -78,7 +84,7 @@ export function Rules() {
     <>
       <header className="page-title">
         <h1>Rules</h1>
-        <p>The daily limit is enforced by the contract on Stellar; the rest by pera's router, before the agent signs anything.</p>
+        <p>Daily and weekly limits are enforced by the contract on Stellar; the rest by pera's router, before the agent signs anything.</p>
       </header>
 
       <Rise className="rules-grid">
@@ -92,8 +98,8 @@ export function Rules() {
             <Field label="Daily limit" hint={`on-chain · rolling ${hours} h`} tag="contract">
               <Money value={form?.daily ?? ""} onChange={(v) => set({ daily: v })} disabled={!form} />
             </Field>
-            <Field label="Weekly limit" hint="rolling 7 days of agent payments · leave empty for no limit" tag="router">
-              <Money value={form?.weekly ?? ""} onChange={(v) => set({ weekly: v })} disabled={!form} placeholder="no limit" />
+            <Field label="Weekly limit" hint={policy && !policy.weekly ? "rolling 7 days · saving it moves it into the contract" : "on-chain · rolling 7 days"} tag={policy && !policy.weekly ? "router" : "contract"}>
+              <Money value={form?.weekly ?? ""} onChange={(v) => set({ weekly: v })} disabled={!form} placeholder="set a limit" />
             </Field>
             <Field label="Max per call" hint="the most a single paywall may charge · leave empty for no limit" tag="router">
               <Money value={form?.perCall ?? ""} onChange={(v) => set({ perCall: v })} disabled={!form} placeholder="no limit" />
@@ -120,15 +126,20 @@ export function Rules() {
               </ArrowFillButton>
             </div>
           </div>
+          {dailyChanged && weeklyChanged && busy === null && <p className="rule-note">Two contract changes, so your passkey is asked twice.</p>}
           {note && <p className={`rule-note ${note.ok ? "ok" : "err"}`}>{note.text}</p>}
         </form>
 
         <aside className="rules-usage">
-          <Usage label="Today" sub={`on-chain window · ${policy?.transfers ?? 0} top-ups`} used={policy?.usedUsdc} cap={policy?.capUsdc ?? null} loading={loading} link={policy?.policyUrl} />
-          <Usage label="This week" sub={`${rules?.paymentsThisWeek ?? 0} payments settled`} used={rules?.spentThisWeekUsdc} cap={rules ? rules.weeklyCapUsdc : null} loading={loading} />
+          <Usage label="Today" sub={`on-chain window · ${policy?.transfers ?? 0} top-up${policy?.transfers === 1 ? "" : "s"}`} used={policy?.usedUsdc} cap={policy?.capUsdc ?? null} loading={loading} link={policy?.policyUrl} />
+          {policy?.weekly ? (
+            <Usage label="This week" sub={`on-chain window · ${policy.weekly.transfers} top-up${policy.weekly.transfers === 1 ? "" : "s"}`} used={policy.weekly.usedUsdc} cap={policy.weekly.capUsdc} loading={loading} link={policy.weekly.policyUrl} />
+          ) : (
+            <Usage label="This week" sub={`${rules?.paymentsThisWeek ?? 0} payments settled`} used={rules?.spentThisWeekUsdc} cap={rules ? rules.weeklyCapUsdc : null} loading={loading} />
+          )}
           <div className="prove">
             <h3>Don't take our word for it.</h3>
-            <p>Ask the agent to pull more than the daily limit. The smart account's own policy rejects it. The error you get back is the contract's, not ours.</p>
+            <p>Ask the agent to pull more than its limit. The smart account's own policy rejects it. The error you get back is the contract's, not ours.</p>
             <button type="button" className="term-link ink" disabled={busy !== null} onClick={() => void prove()}>
               {busy === "prove" ? "asking the chain…" : "try to overspend →"}
             </button>

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/, "decimal USDC amount, up to 7 decimals");
+export const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/, "decimal USDC amount, up to 7 decimals");
 const DecimalTry = z.string().regex(/^\d+(\.\d{1,2})?$/, "decimal TRY amount, up to 2 decimals");
 
 export const RegisterOptionsBody = z.object({ displayName: z.string().min(1).max(64) });
@@ -40,6 +40,10 @@ export const BankTransferBody = z.object({ iban: z.string().min(10).max(40), ref
 export const OfframpBody = z.object({ amountUsdc: DecimalUsdc });
 export const AmountBody = z.object({ amountUsdc: DecimalUsdc });
 export const PolicyBody = z.object({ dailyCapUsdc: DecimalUsdc });
+/** A cap change targets one on-chain window: the daily policy or the weekly one. */
+export const CapBody = z
+  .object({ dailyCapUsdc: DecimalUsdc.optional(), weeklyCapUsdc: DecimalUsdc.optional() })
+  .refine((b) => (b.dailyCapUsdc === undefined) !== (b.weeklyCapUsdc === undefined), "send exactly one of dailyCapUsdc or weeklyCapUsdc");
 export const PayBody = z.object({ url: z.string().url(), prefer: z.enum(["auto", "stellar", "evm"]).default("auto") });
 export const RulesBody = z.object({
   weeklyCapUsdc: DecimalUsdc.nullable(),
@@ -62,4 +66,4 @@ export const EventSchema = z.object({
 });
 export const ErrorSchema = z.object({ error: z.string(), code: z.string().optional(), errorCode: z.number().optional(), detail: z.unknown().optional() });
 
-export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, RulesBody, RulesApprovalBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
+export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, CapBody, RulesBody, RulesApprovalBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };

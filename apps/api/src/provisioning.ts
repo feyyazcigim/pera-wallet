@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
-import { childLogger, createSponsoredAccount, events, generateKeypair, keypairFromSeed, loadEnv, sponsorPublicKey, stellarContractUrl, stellarTxUrl } from "@pera/core";
-import { createPasskey, createStellarWallet, createUser, getPasskey, getStellarWallet, getUser, updateStellarWallet, type User } from "@pera/db";
+import { childLogger, createSponsoredAccount, events, generateKeypair, keypairFromSeed, loadEnv, maxUsdc, sponsorPublicKey, stellarContractUrl, stellarTxUrl } from "@pera/core";
+import { createPasskey, createStellarWallet, createUser, getAgentRules, getPasskey, getStellarWallet, getUser, updateStellarWallet, upsertAgentRules, type User } from "@pera/db";
 import { ensureUserEvmWallet } from "@pera/evm";
 import { verifyRegistration, type RegistrationJSON } from "@pera/passkey";
 import { addAgentRule, attachKit, createKit, deployPasskeySmartAccount, expectedPasskeyContractId, findAgentRuleId, removeInstallerSigner, resetKit } from "@pera/smart-account";
@@ -87,9 +87,12 @@ export async function registerUser(input: RegisterInput, allowedOrigins: string[
       const found = await findAgentRuleId(installerCtx);
       if (found !== null) ruleId = found;
       else {
-        const rule = await addAgentRule(installerCtx, { agentPublicKey: wallet.agentPublicKey, capUsdc: wallet.dailyCapUsdc });
+        // both windows go on the rule at creation: daily and weekly are separate spending_limit instances
+        const weeklyCapUsdc = maxUsdc(env.AGENT_WEEKLY_CAP_USDC, wallet.dailyCapUsdc);
+        const rule = await addAgentRule(installerCtx, { agentPublicKey: wallet.agentPublicKey, capUsdc: wallet.dailyCapUsdc, weeklyCapUsdc });
         ruleId = rule.ruleId;
         ruleTx = rule.txHash;
+        await upsertAgentRules(user.id, { ...(await getAgentRules(user.id)), weeklyCapUsdc });
       }
       await updateStellarWallet(user.id, { agentRuleId: ruleId });
     }

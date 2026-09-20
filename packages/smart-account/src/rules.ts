@@ -16,31 +16,36 @@ export interface AgentRuleResult {
   explorerUrl: string;
   capUsdc: string;
   periodLedgers: number;
+  weeklyCapUsdc: string | null;
 }
 
 /**
  * Builds (but does not submit) the `add_context_rule` transaction for the agent: `CallContract(USDC_SAC)`
- * with the agent's Ed25519 signer and a `spending_limit` policy. The browser signs it with the passkey
+ * with the agent's Ed25519 signer and a `spending_limit` policy for the daily window, plus a second one for the
+ * weekly window when `weeklyCapUsdc` is given. The browser signs it with the passkey
  * (`kit.signAdmin`) and posts the XDR to `/stellar/submit`; or, in the legacy demo, the local owner key signs.
  */
-export async function buildAgentRuleTx(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string }) {
+export async function buildAgentRuleTx(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string; weeklyCapUsdc?: string | null }) {
   const kit = await getKitFor(ctx);
   const agentSigner = createKitEd25519Signer(SMART_ACCOUNT.ed25519Verifier, Keypair.fromPublicKey(p.agentPublicKey).rawPublicKey());
   const params = kit.convertPolicyParams("spending_limit", createSpendingLimitParams(usdcToStroops(p.capUsdc), SMART_ACCOUNT.ledgersPerDay));
   const policies = new Map<string, unknown>([[SMART_ACCOUNT.spendingLimitPolicy, params]]);
+  if (p.weeklyCapUsdc) {
+    policies.set(SMART_ACCOUNT.weeklySpendingLimitPolicy, kit.convertPolicyParams("spending_limit", createSpendingLimitParams(usdcToStroops(p.weeklyCapUsdc), SMART_ACCOUNT.ledgersPerWeek)));
+  }
   const tx = await kit.rules.add(createCallContractContext(USDC_SAC), AGENT_RULE_NAME, [agentSigner], policies);
   return { kit, tx };
 }
 
 /** Legacy demo: owner is a local Ed25519 key, so we can sign and submit here. */
-export async function addAgentRule(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string }): Promise<AgentRuleResult> {
+export async function addAgentRule(ctx: KitCtx, p: { agentPublicKey: string; capUsdc: string; weeklyCapUsdc?: string | null }): Promise<AgentRuleResult> {
   const { kit, tx } = await buildAgentRuleTx(ctx, p);
   const before = await kit.rules.count();
   const res = await kit.multiSigners.adminOperation(tx, await ownerSelected(kit), { resolveContextRuleIds: () => [0], forceMethod: "rpc" });
   const { hash } = unwrapResult(res, "add_context_rule");
   const ruleId = await resolveNewRuleId(ctx, before);
   log.info({ ruleId, hash }, "agent rule created");
-  return { ruleId, txHash: hash, explorerUrl: stellarTxUrl(hash), capUsdc: p.capUsdc, periodLedgers: SMART_ACCOUNT.ledgersPerDay };
+  return { ruleId, txHash: hash, explorerUrl: stellarTxUrl(hash), capUsdc: p.capUsdc, periodLedgers: SMART_ACCOUNT.ledgersPerDay, weeklyCapUsdc: p.weeklyCapUsdc ?? null };
 }
 
 /** After a submitted add_context_rule: rule ids are a monotonic counter, so the new rule is `count - 1`. */
