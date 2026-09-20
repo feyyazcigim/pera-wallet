@@ -6,7 +6,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
     headers: { Authorization: "Bearer ${PERA_AGENT_TOKEN}" },
     timeout: 300,
     connect_timeout: 30,
-    tools: { include: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "payment_status", "request_funding"], resources: false, prompts: false },
+    tools: { include: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "request_funding"], resources: false, prompts: false },
   };
   const snippetYaml = [
     "# ~/.hermes/config.yaml",
@@ -18,7 +18,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
     "    timeout: 300              # a Base payment bridges via CCTP first (1–3 min)",
     "    connect_timeout: 30",
     "    tools:",
-    "      include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, payment_status, request_funding]",
+    "      include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]",
     "",
   ].join("\n");
   const envLine = `PERA_AGENT_TOKEN=${token}`;

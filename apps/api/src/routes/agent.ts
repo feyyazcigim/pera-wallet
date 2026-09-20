@@ -12,7 +12,6 @@ import { sweepUser } from "../autopilot";
 import { loadContext } from "../context";
 import { deriveSweeper } from "../provisioning";
 import { hermesConnectKit } from "../mcp/hermes";
-import { getPayJob, jobView, startPayJob, waitForPayJob } from "../services/jobs";
 import { executePayment, listServices, quotePayment, rulesView } from "../services/payments";
 import { AuthorizeBuildBody, CapBody, DecimalUsdc, EvmTransferBody, PayBody, PayBodyV2, QuoteBody, RulesApprovalBody, RulesBody, XdrBody } from "../schemas";
 
@@ -182,26 +181,11 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     return { tokenId: token.id, scopes: token.scopes, expiresAt: token.expiresAt, ...hermesConnectKit(loadEnv().PUBLIC_API_URL, secret) };
   });
 
-  app.post("/agent/pay", async (req, reply) => {
+  app.post("/agent/pay", async (req) => {
     const user = requireScope(req, "pay");
     const body = PayBodyV2.safeParse(req.body);
     const p = body.success ? body.data : { ...PayBody.parse(req.body), method: "GET" as const };
-    // ?async=1: return a job id at once (Base payments bridge via CCTP first, longer than proxies allow); poll /agent/pay/jobs/:id
-    if ((req.query as { async?: string }).async === "1") {
-      const job = startPayJob(user.id, p.url, () => executePayment(user.id, p));
-      return reply.status(202).send(jobView(job));
-    }
     return withTimeline(user.id, () => executePayment(user.id, p));
-  });
-  /** Snapshot of a payment job; `?wait=<seconds>` (≤ 60) long-polls until it finishes. A failed job re-throws its error. */
-  app.get("/agent/pay/jobs/:id", async (req, reply) => {
-    const user = requireScope(req, "read");
-    const { id } = req.params as { id: string };
-    const wait = Math.min(60, Math.max(0, Number((req.query as { wait?: string }).wait ?? 0) || 0));
-    const job = wait ? await waitForPayJob(id, user.id, wait * 1000) : getPayJob(id, user.id);
-    if (!job) return reply.status(404).send({ error: "unknown or expired job id", code: "NOT_FOUND" });
-    if (job.status === "failed") throw job.error;
-    return jobView(job);
   });
 
   /**

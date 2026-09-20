@@ -33,7 +33,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     service: "pera-api",
     docs: "/openapi.yaml",
     auth: "passkey: POST /auth/register, POST /auth/login/options, POST /auth/login/verify; agents: scoped pat_ tokens from POST /agent/tokens",
-    mcp: { url: "/mcp", transport: "streamable-http", auth: "Authorization: Bearer pat_…", tools: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "payment_status", "request_funding"] },
+    mcp: { url: "/mcp", transport: "streamable-http", auth: "Authorization: Bearer pat_…", tools: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "request_funding"] },
     routes: ["/status", "/me", "/cli/token", "/balances", "/onramp", "/onramp/instructions", "/bank/transfer", "/onramp/:id", "/offramp", "/yield/deposit", "/yield/withdraw", "/yield/position", "/agent/policy", "/agent/authorize/build", "/agent/authorize", "/agent/policy/build", "/agent/rules", "/agent/quote", "/agent/services", "/agent/tokens", "/agent/connect/hermes", "/approvals", "/stellar/submit", "/agent/pay", "/agent/pay/over-cap-demo", "/evm/transfer", "/events", "/events/stream", "/admin/events"],
   }));
   app.get("/openapi.yaml", async (_req, reply) => {

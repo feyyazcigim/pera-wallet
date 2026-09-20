@@ -842,34 +842,6 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-  /agent/pay/jobs/{id}:
-    get:
-      summary: Payment job started by POST /agent/pay?async=1 (Base payments bridge
-        via CCTP first); ?wait=<s> long-polls up to 60 s. Failed jobs answer
-        with the payment's error
-      security: *a2
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: wait
-          in: query
-          schema:
-            type: integer
-            minimum: 0
-            maximum: 60
-      responses:
-        "200":
-          description: "{ jobId, status: pending|paid|failed, url, steps[], result?,
-            error? }"
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        "404": *a1
   /agent/authorize/build:
     post:
       summary: Build add_context_rule (agent signer + spending_limit) for passkey
@@ -1198,8 +1170,8 @@ paths:
       summary: "MCP server (Streamable HTTP, stateless, JSON responses). Bearer =
         agent token (pat_…) or passkey session. Tools: wallet_info,
         get_balances, get_spending_policy, list_services, quote_payment,
-        pay_url, list_payments, payment_status, request_funding — filtered by
-        the token's scopes"
+        pay_url, list_payments, request_funding — filtered by the token's
+        scopes"
       security: *a2
       requestBody:
         required: true
