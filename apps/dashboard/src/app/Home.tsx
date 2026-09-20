@@ -55,7 +55,7 @@ export function Home() {
                   +<CountUp value={earnedUsdc} format={(n) => usd(n, 6)} />
                 </mark>
               </dd>
-              <small>vault value − what you put in</small>
+              <small>vault value minus what you put in</small>
             </div>
             <div>
               <dt>Agent budget left today</dt>

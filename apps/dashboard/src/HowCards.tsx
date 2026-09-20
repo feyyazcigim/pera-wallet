@@ -320,7 +320,7 @@ function ChainsVisual() {
   const leg = outbound ? DESTS[sel] : { ...INBOUND, live: true };
   const k = segKeyframes(outbound ? outSeg(sel) : IN_SEG);
   return (
-    <div className="v-chains" ref={ref}>
+    <div className="v-chains" ref={ref} data-leg={outbound ? "out" : "in"}>
       <svg viewBox="0 0 640 236" width="100%" height="100%" aria-hidden="true">
         <path d={segPath(IN_SEG)} fill="none" stroke={outbound ? "#dcdcdc" : "#0a0a0a"} strokeWidth={outbound ? 1.2 : 1.6} strokeDasharray={outbound ? "2 6" : undefined} strokeLinecap="round" />
         {DESTS.map((d, i) => {

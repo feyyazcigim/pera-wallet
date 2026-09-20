@@ -941,3 +941,177 @@ section[id] {
 .steps-stage .v-yield-head {
   padding: 40px 48px 0;
 }
+
+/* ── small screens ─────────────────────────────────────────────────────────
+   Same page, one column. The flow scene does not shrink to fit: it keeps its size and the
+   camera follows the step that is active, so labels stay readable. */
+@media (max-width: 760px) {
+  :root {
+    --nav-h: 60px;
+  }
+  html,
+  body {
+    overflow-x: clip; /* clip, not hidden: sticky sections keep working */
+  }
+  body {
+    min-width: 0;
+    font-size: 16px;
+  }
+  .rules > * {
+    min-width: 0;
+  }
+  main {
+    padding: 0 20px;
+  }
+  .nav-inner {
+    gap: 12px;
+  }
+  .nav nav {
+    display: none;
+  }
+  .nav .obsidian-arrow-fill-btn {
+    margin-left: auto;
+  }
+  .logo {
+    font-size: 24px;
+  }
+
+  .hero {
+    min-height: 0;
+    padding: 32px 0 56px;
+  }
+  h1 {
+    font-size: clamp(50px, 15.5vw, 96px);
+  }
+  .lede {
+    font-size: 18px;
+  }
+  .cta {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 32px;
+  }
+  .cta > * {
+    justify-content: center;
+    width: 100% !important;
+    text-align: center;
+  }
+  h2 {
+    font-size: 36px;
+  }
+
+  /* pinned flow: camera follows the step */
+  .pin {
+    height: 360vh;
+  }
+  .stage {
+    width: 100%;
+    border-radius: 16px;
+  }
+  .stage-bar em {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .flow {
+    overflow: hidden;
+  }
+  .flow svg {
+    width: 240%;
+    max-width: none;
+    transform: translateX(var(--cam, 0%));
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .flow[data-step="1"] {
+    --cam: -5%;
+  }
+  .flow[data-step="2"] {
+    --cam: -10%;
+  }
+  .flow[data-step="3"] {
+    --cam: -33.3%;
+  }
+  .flow[data-step="4"] {
+    --cam: -58.3%;
+  }
+  .flow-steps {
+    grid-template-columns: 1fr 1fr;
+  }
+  .flow-steps li {
+    padding: 12px 14px;
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  /* how it works: the stage sits on top, the steps under it */
+  .how {
+    padding: 72px 0 48px;
+  }
+  .how-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .how-head p {
+    max-width: none;
+  }
+  .steps {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 32px;
+  }
+  .steps-stage {
+    order: -1;
+    height: 300px;
+    min-height: 0;
+    border-radius: 18px;
+  }
+  .steps-list button span {
+    font-size: 21px;
+  }
+  .steps-body p {
+    max-width: none;
+  }
+  .steps-stage .v-slip {
+    transform: scale(0.9);
+  }
+  .steps-stage .v-quote {
+    width: 90%;
+  }
+  .steps-stage .v-pay {
+    width: 90%;
+    height: 240px;
+  }
+  /* same camera idea as the flow: keep the scene readable and pan to the leg that is moving */
+  .steps-stage .v-chains {
+    padding: 16px 8px;
+    overflow: hidden;
+  }
+  .v-chains svg {
+    width: 165%;
+    max-width: none;
+    transform: translateX(-3%);
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .v-chains[data-leg="out"] svg {
+    transform: translateX(-39.4%);
+  }
+  .steps-stage .v-yield-head {
+    padding: 24px 20px 0;
+  }
+
+  .rules {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 64px 0 80px;
+  }
+  .rules > div:first-child > p {
+    font-size: 17px;
+  }
+  .closing {
+    padding: 32px 0 80px;
+  }
+  .obsidian-text-fill .tfa-heading {
+    font-size: clamp(30px, 9vw, 56px);
+  }
+}

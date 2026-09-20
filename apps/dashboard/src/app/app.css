@@ -1301,3 +1301,220 @@ h2.section-title:not(.section-head *) {
     animation: none;
   }
 }
+
+/* ── small screens: dashboard + onboarding ─────────────────────────────── */
+@media (max-width: 760px) {
+  .app-nav {
+    height: auto;
+  }
+  .app-nav .nav-inner {
+    flex-wrap: wrap;
+    height: auto;
+    margin: 8px 12px 0;
+    padding: 10px 14px 0 18px;
+    gap: 0 12px;
+    border-radius: 22px;
+  }
+  .app-user {
+    margin-left: auto;
+    gap: 10px;
+  }
+  .app-tabs {
+    order: 3;
+    width: 100%;
+    margin: 4px -6px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .app-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .app-tabs p {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  .dash {
+    overflow-x: clip;
+  }
+  .dash-main {
+    gap: 48px;
+    padding: 0 16px 80px;
+  }
+  /* Obsidian MagnetTabs rows scroll sideways instead of widening the page */
+  .dash .items-start.justify-start {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .dash .items-start.justify-start::-webkit-scrollbar {
+    display: none;
+  }
+  .page-title h1,
+  .dash-hero h1 {
+    font-size: clamp(44px, 13vw, 72px);
+  }
+  .hero-figure {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .hero-total strong {
+    font-size: clamp(60px, 19vw, 110px);
+  }
+  .hero-facts {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 22px;
+  }
+  .hero-facts > div {
+    padding: 0 16px 0 0;
+    border-left: 0;
+  }
+  .deposit-box dl {
+    grid-template-columns: 1fr;
+  }
+  .deposit-box dl > div {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .deposit-box dd {
+    overflow-wrap: anywhere;
+  }
+  .stage-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 10px 12px 0;
+  }
+  .stage-head em {
+    order: -1;
+    padding-bottom: 8px;
+  }
+  .dash-cols,
+  .rules-grid,
+  .cols,
+  .keys-grid {
+    grid-template-columns: 1fr;
+  }
+  .dash-cols > *,
+  .rules-grid > *,
+  .cols > *,
+  .keys-grid > * {
+    min-width: 0;
+  }
+  .rulecard > header {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .chain-toggles {
+    flex-wrap: wrap;
+  }
+  .term-tabs {
+    overflow-x: auto;
+  }
+  .term-line,
+  .term-out {
+    overflow-wrap: anywhere;
+  }
+  .rulecard .row.field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .save-row {
+    flex-wrap: wrap;
+  }
+  .tiles {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+  .tiles .tile,
+  .tiles .tile + .tile {
+    padding: 22px 0 0;
+    border-left: 0;
+  }
+  .tile strong {
+    font-size: clamp(30px, 9vw, 44px);
+  }
+  /* charts keep a readable scale and pan sideways */
+  .plot {
+    overflow-x: auto;
+    direction: rtl; /* start panned to today, the right edge */
+  }
+  .plot svg {
+    min-width: 600px;
+    direction: ltr;
+  }
+  .plot .tip {
+    display: none;
+  }
+  .panel {
+    padding: 20px 16px 22px;
+  }
+  .hbars li {
+    grid-template-columns: 96px 1fr 64px;
+  }
+  .acct {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .acct dd {
+    flex-wrap: wrap;
+  }
+  /* history: drop the secondary columns, keep what happened, how much and when */
+  .history th:nth-child(2),
+  .history td:nth-child(2),
+  .history th:nth-child(5),
+  .history td:nth-child(5) {
+    display: none;
+  }
+  .history td {
+    height: auto;
+    padding: 12px 10px 12px 0;
+    font-size: 14px;
+  }
+  .history td:nth-child(4) {
+    white-space: nowrap;
+  }
+
+  .onb {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .onb-side {
+    gap: 24px;
+    padding: 20px 20px 28px;
+  }
+  .onb-side h1 {
+    margin-bottom: 14px;
+    font-size: clamp(38px, 11vw, 56px);
+  }
+  .onb-side p {
+    font-size: 16px;
+  }
+  /* the streaming list is decoration; on a phone the form should be one thumb away */
+  .onb-stream {
+    display: none;
+  }
+  .onb-main {
+    place-items: start stretch;
+    padding: 28px 16px 56px;
+  }
+  .onb-card {
+    width: 100%;
+  }
+  .onb-card h2 {
+    font-size: 34px;
+  }
+  .onb-card form,
+  .onb-login {
+    padding: 22px 18px 24px;
+  }
+  .onb-card input {
+    font-size: 20px;
+  }
+  .onb-card .obsidian-arrow-fill-btn {
+    align-self: stretch;
+    width: 100% !important;
+    justify-content: center;
+  }
+}

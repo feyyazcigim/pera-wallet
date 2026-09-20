@@ -75,9 +75,10 @@ export default function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+  const small = vw <= 760;
   const pill = scrolled
-    ? { maxWidth: Math.min(1120, vw - 48), marginTop: 10, height: 60, borderRadius: 40, paddingLeft: 30, paddingRight: 8 }
-    : { maxWidth: vw, marginTop: 0, height: 74, borderRadius: 0, paddingLeft: 48, paddingRight: 48 };
+    ? { maxWidth: Math.min(1120, vw - (small ? 24 : 48)), marginTop: 10, height: small ? 54 : 60, borderRadius: 40, paddingLeft: small ? 20 : 30, paddingRight: 8 }
+    : { maxWidth: vw, marginTop: 0, height: small ? 60 : 74, borderRadius: 0, paddingLeft: small ? 20 : 48, paddingRight: small ? 12 : 48 };
 
   // hero copy drifts up and fades as you scroll away
   const heroOpacity = useTransform(scrollY, [0, 520], [1, 0]);
@@ -103,7 +104,7 @@ export default function App() {
   const rulesRef = useRef<HTMLElement>(null);
   const { scrollYProgress: rulesRaw } = useScroll({ target: rulesRef, offset: ["start end", "center center"] });
   const rulesP = useSpring(rulesRaw, SPRING);
-  const cardX = useTransform(rulesP, [0, 1], [140, 0]);
+  const cardX = useTransform(rulesP, [0, 1], [small ? 0 : 140, 0]); // no sideways slide on a phone: it would push the card off screen
   const cardOpacity = useTransform(rulesP, [0, 0.6], [0, 1]);
 
   // stack marquee + footer wordmark follow scroll
@@ -232,7 +233,7 @@ export default function App() {
       </main>
 
       <section className="closing">
-        <TextStream prefix="Your agent pays for" items={PAYS_FOR} height="44vh" fontSize="clamp(2rem, 3.6vw, 3.4rem)" fontWeight={700} />
+        <TextStream prefix="Your agent pays for" items={PAYS_FOR} height={small ? "32vh" : "44vh"} fontSize={small ? "1.2rem" : "clamp(2rem, 3.6vw, 3.4rem)"} fontWeight={700} />
         <ArrowFillButton href={DASHBOARD_URL} className="lg" {...LAUNCH_BTN}>
           Launch app
         </ArrowFillButton>

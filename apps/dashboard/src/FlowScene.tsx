@@ -156,7 +156,7 @@ export const FlowScene = forwardRef<FlowSceneHandle, Props>(function FlowScene(
   const typing = step === 0 && typed < command.length;
 
   return (
-    <div className="flow">
+    <div className="flow" data-step={step}>
       <svg viewBox="0 50 1200 440" role="img" aria-label="TRY becomes USDC, earns yield in a vault, and funds AI agent payments over x402">
         {/* rails */}
         <Rail d={SEG_DEPOSIT} active={step >= 1} />
