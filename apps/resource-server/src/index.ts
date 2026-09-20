@@ -29,23 +29,22 @@ try {
 // Merchant on Base Sepolia: an explicit address, or an app-owned Privy wallet created on first start.
 const payToEvm = env.MERCHANT_EVM_ADDRESS ?? (isPrivyConfigured() ? (await ensureAppWallet("merchant")).address : undefined);
 
-const facilitators = [new HTTPFacilitatorClient({ url: env.X402_FACILITATOR_URL })];
-// A facilitator that answers /supported with anything but 200 makes every paywalled route 500 — say so at boot
-// (typical: X402_FACILITATOR_URL pointed at OpenZeppelin's, which needs OZ_FACILITATOR_API_KEY; x402.org needs no key).
+// Facilitators: X402_FACILITATOR_URL first (x402.org needs no key). OpenZeppelin's needs OZ_FACILITATOR_API_KEY —
+// attached automatically when the primary URL is theirs, and it is added as a second facilitator otherwise.
+const ozHeaders = env.OZ_FACILITATOR_API_KEY ? { Authorization: `Bearer ${env.OZ_FACILITATOR_API_KEY}` } : undefined;
+const isOz = (url: string) => url.includes("openzeppelin.com");
+const withAuth = (url: string) =>
+  new HTTPFacilitatorClient(
+    isOz(url) && ozHeaders ? { url, createAuthHeaders: async () => ({ verify: ozHeaders, settle: ozHeaders, supported: ozHeaders }) } : { url },
+  );
+const facilitators = [withAuth(env.X402_FACILITATOR_URL)];
+if (ozHeaders && !isOz(env.X402_FACILITATOR_URL)) facilitators.push(withAuth(X402.ozFacilitatorTestnet));
+// A facilitator that answers /supported with anything but 200 makes every paywalled route 500 — say so at boot.
 try {
-  const r = await fetch(`${env.X402_FACILITATOR_URL.replace(/\/$/, "")}/supported`);
-  if (!r.ok) log.error({ facilitator: env.X402_FACILITATOR_URL, status: r.status }, "facilitator rejected /supported — paywalled routes will fail; use https://x402.org/facilitator or add OZ_FACILITATOR_API_KEY");
+  const r = await fetch(`${env.X402_FACILITATOR_URL.replace(/\/$/, "")}/supported`, { headers: isOz(env.X402_FACILITATOR_URL) ? ozHeaders : undefined });
+  if (!r.ok) log.error({ facilitator: env.X402_FACILITATOR_URL, status: r.status }, "facilitator rejected /supported — paywalled routes will fail; use https://x402.org/facilitator or set OZ_FACILITATOR_API_KEY");
 } catch (err) {
   log.error({ err, facilitator: env.X402_FACILITATOR_URL }, "facilitator unreachable");
-}
-if (env.OZ_FACILITATOR_API_KEY) {
-  const headers = { Authorization: `Bearer ${env.OZ_FACILITATOR_API_KEY}` };
-  facilitators.push(
-    new HTTPFacilitatorClient({
-      url: X402.ozFacilitatorTestnet,
-      createAuthHeaders: async () => ({ verify: headers, settle: headers, supported: headers }),
-    }),
-  );
 }
 
 const server = new x402ResourceServer(facilitators).register(STELLAR_CAIP2, new ExactStellarScheme());
