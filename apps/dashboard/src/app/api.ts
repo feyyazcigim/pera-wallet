@@ -117,12 +117,10 @@ export interface Backend {
 }
 
 /* ── agent keys ───────────────────────────────────────────────────────── */
-export type AgentScope = "read" | "pay" | "fund" | "admin";
+export type AgentScope = "read" | "pay";
 export const SCOPES: { id: AgentScope; label: string; hint: string }[] = [
   { id: "read", label: "read", hint: "balances, policy, quotes, history" },
   { id: "pay", label: "pay", hint: "pay x402 paywalls under your rules" },
-  { id: "fund", label: "fund", hint: "ask for deposit instructions" },
-  { id: "admin", label: "admin", hint: "submit passkey-signed changes" },
 ];
 export type AgentKey = { id: string; name: string; scopes: AgentScope[]; createdAt: string; expiresAt: string | null; lastUsedAt: string | null; revokedAt: string | null };
 /** What an MCP client needs — mirrors apps/api/src/mcp/hermes.ts, computed here so the secret never round-trips. */
@@ -144,6 +142,8 @@ export function connectKit(secret: string) {
 const TOKEN_KEY = "pera.session"; // same keys as apps/web, so a session carries over
 const CREDENTIAL_KEY = "pera.credentialId";
 const DEMO_KEY = "pera.demo";
+const NAME_KEY = "pera.name";
+const FUNDED_KEY = "pera.funded";
 const ls = {
   get: (k: string) => {
     try {
@@ -163,7 +163,19 @@ const ls = {
 };
 export const session = {
   token: () => ls.get(TOKEN_KEY),
-  setToken: (t: string | null) => ls.set(TOKEN_KEY, t),
+  setToken: (t: string | null) => {
+    ls.set(TOKEN_KEY, t);
+    if (t === null) {
+      ls.set(NAME_KEY, null);
+      ls.set(FUNDED_KEY, null);
+    }
+  },
+  /** The owner's name from the last visit, so the greeting is right on first paint instead of changing when /me lands. */
+  name: () => ls.get(NAME_KEY),
+  setName: (n: string | null) => ls.set(NAME_KEY, n),
+  /** Same idea for the headline's last word: whether the wallet held money last time. */
+  funded: () => ls.get(FUNDED_KEY) === "1",
+  setFunded: (on: boolean) => ls.set(FUNDED_KEY, on ? "1" : "0"),
   isDemo: () => ls.get(DEMO_KEY) === "1",
   setDemo: (on: boolean) => ls.set(DEMO_KEY, on ? "1" : null),
   exists: () => Boolean(ls.get(TOKEN_KEY)) || ls.get(DEMO_KEY) === "1",

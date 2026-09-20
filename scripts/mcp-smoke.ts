@@ -60,7 +60,7 @@ say("2/8 tools/list + wallet_info + policy");
 const c = await client(full.token);
 const tools = (await c.listTools()).tools.map((t) => t.name);
 console.log(`  tools: ${tools.join(", ")}`);
-assert(tools.includes("pay_url") && tools.includes("quote_payment") && !tools.includes("request_funding"), "read+pay token must list pay_url but not request_funding");
+assert(tools.includes("pay_url") && tools.includes("quote_payment"), "read+pay token must list pay_url and quote_payment");
 const info = await call(c, "wallet_info");
 assert(!info.isError, `wallet_info: ${info.text}`);
 console.log(`  ${info.text}`);

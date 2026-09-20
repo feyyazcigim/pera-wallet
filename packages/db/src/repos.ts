@@ -373,8 +373,9 @@ export async function listUnsettledDepositOrders(maxAgeMs = 6 * 3600_000): Promi
 }
 
 // ---------------------------------------------------------------------------- agent tokens (scoped, revocable)
-export type AgentScope = "read" | "pay" | "fund" | "admin";
-export const ALL_SCOPES: AgentScope[] = ["read", "pay", "fund", "admin"];
+/** What an agent key may do. Funding, rule and cap changes are the owner's alone: they need the passkey session. */
+export type AgentScope = "read" | "pay";
+export const ALL_SCOPES: AgentScope[] = ["read", "pay"];
 
 export interface AgentToken {
   id: string;
@@ -391,7 +392,7 @@ const rowToToken = (r: Record<string, unknown>): AgentToken => ({
   id: String(r.id),
   userId: String(r.user_id),
   name: String(r.name),
-  scopes: String(r.scopes).split(",").filter(Boolean) as AgentScope[],
+  scopes: String(r.scopes).split(",").filter((s): s is AgentScope => (ALL_SCOPES as string[]).includes(s)), // keys minted with retired scopes keep only what still exists
   createdAt: new Date(r.created_at as string).toISOString(),
   expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : null,
   lastUsedAt: r.last_used_at ? new Date(r.last_used_at as string).toISOString() : null,

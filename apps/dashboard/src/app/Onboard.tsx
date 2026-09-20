@@ -92,9 +92,6 @@ export function Onboard() {
         <AnimatePresence mode="wait">
           {busy && mode === "create" ? (
             <motion.div key="prov" className="onb-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}>
-              <span className="eyebrow">
-                <i /> about half a minute · keep this tab open
-              </span>
               <h2>
                 Setting up your <mark>wallet</mark>.
               </h2>

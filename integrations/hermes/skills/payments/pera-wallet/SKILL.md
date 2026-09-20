@@ -32,7 +32,7 @@ Tool names appear as `mcp__pera_wallet__<tool>` (if your Hermes shows `mcp_pera_
 4. Report the result to the user with the receipt: `amountUsdc`, `network`, `txHash`, `explorerUrl`.
 5. If `status` is `requires_approval`: stop, tell the user the `approveUrl` (they approve in the dashboard), then retry
    the same call with `approval_id`. If `status` is `denied`: report `reason` and do not retry with the same arguments.
-6. If balances are too low, call `request_funding` (needs the `fund` scope) and give the user the IBAN + reference;
+6. If balances are too low, tell the user to add lira from the Pera dashboard (Home, "add lira");
    you cannot fund the wallet yourself.
 
 ## Pitfalls

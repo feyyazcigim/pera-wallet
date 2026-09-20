@@ -16,4 +16,4 @@ only support stdio MCP servers can use this shim; it forwards every tool call an
 ```
 
 Mint the token in the dashboard (Connect an agent) or with `POST /agent/tokens` while logged in with your passkey.
-Scopes: `read` (balances, policy, quotes), `pay` (pay paywalls), `fund` (bank instructions), `admin` (CLI only).
+Scopes: `read` (balances, policy, quotes), `pay` (pay paywalls). Funding and rule changes stay with the owner.

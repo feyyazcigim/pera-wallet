@@ -4,7 +4,7 @@ import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { FlowScene, type FlowSceneHandle, type FlowStep } from "../FlowScene";
 import { CountUp, Hl, Line, Rise } from "../ui";
-import { api, CapExceededError, NETWORKS, type DepositDetails as DepositDetailsT, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
+import { api, session, CapExceededError, NETWORKS, type DepositDetails as DepositDetailsT, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
 import { describe, pendingOf, shortUrl, timeAgo, usd, useApp, type EventKind } from "./store";
 
 const FILTERS: Record<string, "all" | EventKind> = { All: "all", Deposits: "deposit", Vault: "yield", Agent: "agent", Bridge: "bridge" };
@@ -24,17 +24,21 @@ export function Home() {
   const pending = useMemo(() => pendingOf(events), [events]);
   const hour = new Date().getHours();
   const hello = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const first = me?.displayName.split(" ")[0] ?? "";
-  const idle = !loading && (balances?.total ?? 0) === 0;
+  // the name comes from the last visit until /me answers; on a first visit the headline waits for it rather than rewriting itself
+  const first = (me?.displayName ?? session.name() ?? "").split(" ")[0];
+  const greet = Boolean(first) || !loading;
+  const idle = balances ? balances.total === 0 : !session.funded();
 
   return (
     <>
       <section className="dash-hero">
-        <h1>
-          <Line delay={0.05}>
-            {hello}
-            {first && `, ${first}`}. Your lira is <Hl delay={0.7}>{idle ? "on its way" : "earning"}</Hl>.
-          </Line>
+        <h1 className="hero-greeting">
+          {greet && (
+            <Line delay={0.05}>
+              {hello}
+              {first && `, ${first}`}. Your lira is <Hl delay={0.7}>{idle ? "on its way" : "earning"}</Hl>.
+            </Line>
+          )}
         </h1>
 
         <Rise className="hero-figure" delay={0.35}>
@@ -66,7 +70,7 @@ export function Home() {
             </div>
           </dl>
         </Rise>
-        <DepositDetails open={idle} />
+        <DepositDetails open={!loading && idle} />
       </section>
 
       <LiveFlow />

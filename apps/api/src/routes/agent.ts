@@ -43,7 +43,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
    * `kit.rules.add(...)` using `agentPublicKey` + `dailyCapUsdc` below.
    */
   app.post("/agent/authorize/build", async (req) => {
-    const ctx = await loadContext(requireScope(req, "admin").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { dailyCapUsdc } = AuthorizeBuildBody.parse(req.body ?? {});
     const cap = dailyCapUsdc ?? ctx.dailyCapUsdc;
     const weeklyCapUsdc = (await getAgentRules(ctx.userId)).weeklyCapUsdc ?? maxUsdc(loadEnv().AGENT_WEEKLY_CAP_USDC, cap);
@@ -54,7 +54,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
 
   /** Step 2: submit the passkey-signed transaction sponsored, then record the new rule id. */
   app.post("/agent/authorize", async (req) => {
-    const ctx = await loadContext(requireScope(req, "admin").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { xdr } = XdrBody.parse(req.body);
     const r = await submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
     const ruleId = await resolveNewRuleId(ctx);
@@ -65,7 +65,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
 
   /** Cap change, same two-step passkey flow. */
   app.post("/agent/policy/build", async (req) => {
-    const ctx = await loadContext(requireScope(req, "admin").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { dailyCapUsdc, weeklyCapUsdc } = CapBody.parse(req.body);
     if (ctx.agentRuleId === undefined) throw Object.assign(new Error("agent not authorised yet"), { statusCode: 409, code: "NOT_AUTHORISED" });
     if (weeklyCapUsdc !== undefined) {
@@ -77,7 +77,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     return { json: tx.toJSON(), xdr: tx.toXDR(), ruleId: ctx.agentRuleId, dailyCapUsdc, window: "daily" as const, method: "set_spending_limit" as const };
   });
   app.post("/agent/policy", async (req) => {
-    const ctx = await loadContext(requireScope(req, "admin").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { xdr, dailyCapUsdc, weeklyCapUsdc, rules } = XdrBody.extend({ dailyCapUsdc: DecimalUsdc.optional(), weeklyCapUsdc: DecimalUsdc.optional(), rules: RulesBody.optional() }).parse(req.body);
     const r = await submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
     if (dailyCapUsdc) await updateStellarWallet(ctx.userId, { dailyCapUsdc });
@@ -90,7 +90,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
 
   /** Generic sponsored submission of any passkey-signed transaction targeting the user's smart account. */
   app.post("/stellar/submit", async (req) => {
-    const ctx = await loadContext(requireScope(req, "admin").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { xdr } = XdrBody.parse(req.body);
     return submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
   });

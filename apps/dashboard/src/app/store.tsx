@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api, type Balances, type Me, type PeraEvent, type Policy, type Position, type Rules } from "./api";
+import { api, session, type Balances, type Me, type PeraEvent, type Policy, type Position, type Rules } from "./api";
 
 /** Everything the dashboard pages read. Loaded once, refreshed on every SSE event and on a slow poll. */
 type AppData = {
@@ -42,8 +42,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const b = api();
     // each call settles on its own: a missing vault (no DEFINDEX key) must not blank the whole page
     const [m, bal, pos, pol, ev, rul] = await Promise.allSettled([b.me(), b.balances(), b.position(), b.policy(), b.events(), b.rules()]);
-    if (m.status === "fulfilled") setMe(m.value);
-    if (bal.status === "fulfilled") setBalances(bal.value);
+    if (m.status === "fulfilled") {
+      setMe(m.value);
+      if (!session.isDemo()) session.setName(m.value.displayName);
+    }
+    if (bal.status === "fulfilled") {
+      setBalances(bal.value);
+      if (!session.isDemo()) session.setFunded(bal.value.total > 0);
+    }
     if (pos.status === "fulfilled") setPosition(pos.value);
     if (pol.status === "fulfilled") setPolicy(pol.value);
     if (rul.status === "fulfilled") setRules(rul.value);

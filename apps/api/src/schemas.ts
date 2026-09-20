@@ -52,7 +52,7 @@ export const RulesBody = z.object({
   /** Single payments above this amount need a human approval in the dashboard; omit/null = never. */
   approveAboveUsdc: DecimalUsdc.nullable().optional(),
 });
-export const AgentScopeEnum = z.enum(["read", "pay", "fund", "admin"]);
+export const AgentScopeEnum = z.enum(["read", "pay"]);
 export const CreateTokenBody = z.object({
   name: z.string().min(1).max(64),
   scopes: z.array(AgentScopeEnum).min(1).default(["read", "pay"]),

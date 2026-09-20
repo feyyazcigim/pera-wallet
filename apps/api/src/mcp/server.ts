@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BASE_SEPOLIA_CAIP2, getBalances, getContractUsdcBalance, loadEnv, STELLAR_CAIP2, stellarAccountUrl, stellarContractUrl, baseAddressUrl } from "@pera/core";
-import { listAgentTokens, listEvents, getOpenDepositOrder, type AgentScope, type User } from "@pera/db";
+import { listAgentTokens, listEvents, type AgentScope, type User } from "@pera/db";
 import { getBaseUsdcBalance } from "@pera/evm";
 import { getPolicyUsage } from "@pera/smart-account";
 import { getPosition, isConfigured } from "@pera/yield";
@@ -9,7 +9,6 @@ import { ApprovalRequiredError, PaywallError, RuleViolationError } from "@pera/x
 import { SpendingCapExceededError } from "@pera/smart-account";
 import { loadContext } from "../context";
 import { executePayment, listServices, quotePayment, rulesView } from "../services/payments";
-import { fundingInstructions } from "../services/funding";
 
 const DecimalUsdc = z.string().regex(/^\d+(\.\d{1,7})?$/).describe("decimal USDC amount, e.g. \"0.25\"");
 const Network = z.enum(["stellar:testnet", "eip155:84532"]);
@@ -239,22 +238,6 @@ export function buildMcpServer(principal: McpPrincipal): McpServer {
     },
   ));
 
-  reg("fund", () => server.registerTool(
-    "request_funding",
-    { title: "How the human tops up", description: "Bank details (IBAN + reference) the human must use to send TRY; the anchor converts it to USDC in the treasury. Use when balances are too low to pay. The agent cannot fund the wallet itself.", inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false } },
-    async () => {
-      const denied = guard("fund");
-      if (denied) return denied;
-      try {
-        const open = await getOpenDepositOrder(userId);
-        const f = open ? { iban: open.iban, bankName: open.bankName, reference: open.reference, anchorTxId: open.anchorTxId, minTry: 50, maxTry: 3000 } : await fundingInstructions(userId);
-        return ok(`Ask the owner to send 50–3000 TRY to IBAN ${f.iban} with reference "${f.reference}" (sandbox: POST ${env.PUBLIC_API_URL}/bank/transfer).`, { ...f, sandboxBankEndpoint: `${env.PUBLIC_API_URL}/bank/transfer` });
-      } catch (err) {
-        return toolError(err);
-      }
-    },
-  ));
-
   void Network;
   return server;
 }
@@ -263,4 +246,4 @@ const INSTRUCTIONS = `Pera is the user's crypto wallet on Stellar (+ Base Sepoli
 Rules of engagement: (1) call wallet_info once per session; (2) never guess prices — quote_payment first when the price is unknown;
 (3) pay_url pays only within the owner's rules and the on-chain daily cap; if it returns status=requires_approval, tell the human to open approveUrl, then retry with approval_id;
 (4) if status=denied, do not retry with the same arguments — report the reason; (5) cite txHash and explorerUrl for every payment;
-(6) the agent cannot fund the wallet: request_funding gives the human bank instructions. Amounts are decimal USDC strings.`;
+(6) the agent cannot fund the wallet or change its rules: only the owner can, from the dashboard. Amounts are decimal USDC strings.`;

@@ -20,7 +20,7 @@ declare module "fastify" {
 /**
  * Three credentials:
  *  - `ps_…` passkey session (owner: everything),
- *  - `pat_…` scoped agent token (AI agents / CLI: `read`, `pay`, `fund`, `admin`),
+ *  - `pat_…` scoped agent token (AI agents / CLI: `read`, `pay`),
  *  - the static admin bearer (`API_BEARER_TOKEN`) for `/admin/*`.
  * `/events/stream` (and `/mcp` GET) also accept `?token=` for clients that cannot set headers.
  */

@@ -37,7 +37,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
    * treasury. Opens a SEP-6 deposit order once and keeps returning it until it has been paid into.
    */
   app.post("/onramp/instructions", async (req) => {
-    const user = requireScope(req, "fund");
+    const user = requireOwner(req);
     const open = await getOpenDepositOrder(user.id);
     if (open) return { iban: open.iban, bankName: open.bankName, reference: open.reference, anchorTxId: open.anchorTxId, minTry: 50, maxTry: 3000, createdAt: open.createdAt };
     const ctx = await loadContext(user.id);
@@ -74,7 +74,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
 
   /** SEP-6 deposit into the user's treasury account; the sandbox wire is simulated; completion tracked in the background. */
   app.post("/onramp", async (req, reply) => {
-    const ctx = await loadContext(requireScope(req, "fund").id);
+    const ctx = await loadContext(requireOwner(req).id);
     const { amountTry } = OnrampBody.parse(req.body);
     const start = await startOnramp({ accountSecret: ctx.treasurySecret, amountTry, userId: ctx.userId });
     await simulateBankTransfer(start.id, amountTry);

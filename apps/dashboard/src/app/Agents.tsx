@@ -54,7 +54,9 @@ export function Agents() {
     }
   }
 
-  const kit = fresh ? connectKit(fresh.secret) : null;
+  // the snippets are always there; they carry the real key for the one moment it exists
+  const token = fresh?.secret ?? "pat_your-key";
+  const kit = connectKit(token);
   return (
     <>
       <header className="page-title">
@@ -67,7 +69,7 @@ export function Agents() {
           <div className="rulecard">
             <header>
               <span>new key</span>
-              <em>{fresh ? "shown once — copy it now" : "read + pay is enough for Hermes"}</em>
+              <em>{fresh ? "shown once, copy it now" : "read + pay is all an agent needs"}</em>
             </header>
             <div className="row field">
               <div>
@@ -105,23 +107,23 @@ export function Agents() {
         </form>
 
         <aside className="snippets">
-          {kit && fresh ? (
-            <>
-              <Snippet title={`${fresh.key.name} · key`} hint="not stored — revoke and mint a new one if you lose it" secret text={fresh.secret} />
-              <Snippet title="Hermes · ~/.hermes/.env" hint="then paste the YAML into ~/.hermes/config.yaml" text={kit.envLine} />
-              <Snippet title="Hermes · config.yaml" hint="also works for the Dokploy bot: PERA_AGENT_TOKEN env" text={kit.snippetYaml} />
-              <Snippet title="Claude Code" hint="one command" text={kit.claudeCode} />
-              <Snippet title="MCP endpoint" hint="Authorization: Bearer <key>" text={kit.mcpUrl} />
-            </>
+          {fresh ? (
+            <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />
           ) : (
             <div className="prove">
               <h3>How it connects.</h3>
-              <p>The key goes into your agent's environment; the agent talks to this wallet over MCP (`/mcp`). It can quote and pay paywalls, never move funds elsewhere or change your rules.</p>
+              <p>
+                The key goes into your agent's environment and the agent talks to this wallet over MCP at <code>/mcp</code>. It can quote and pay paywalls. It can never move funds elsewhere, add money or change your rules.
+              </p>
               <a className="term-link ink" href="https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes" target="_blank" rel="noreferrer">
                 Hermes integration guide ↗
               </a>
             </div>
           )}
+          <CodeBlock label="shell" file="Claude Code" note="One command." prompt text={kit.claudeCode} mark={token} />
+          <CodeBlock label="env" file="~/.hermes/.env" note="Hermes reads the key from its environment." text={kit.envLine} mark={token} />
+          <CodeBlock label="yaml" file="~/.hermes/config.yaml" note="The same block works for the hosted bot." text={kit.snippetYaml} />
+          <CodeBlock label="http" file="MCP endpoint" note="Any MCP client: send the key as a Bearer token." text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />
         </aside>
       </Rise>
 
@@ -161,27 +163,39 @@ export function Agents() {
   );
 }
 
-function Snippet({ title, hint, text, secret }: { title: string; hint: string; text: string; secret?: boolean }) {
+/** A terminal-style code block: what it is, where it goes, the code, and a copy button. `mark` highlights the key inside it. */
+function CodeBlock({ label, file, note, text, prompt, secret, mark }: { label: string; file: string; note: string; text: string; prompt?: boolean; secret?: boolean; mark?: string }) {
   const [copied, setCopied] = useState(false);
+  const parts = mark && text.includes(mark) ? text.split(mark) : [text];
   return (
-    <div className={`snippet ${secret ? "secret" : ""}`}>
+    <figure className={`code ${secret ? "secret" : ""}`}>
       <header>
-        <span>{title}</span>
-        <small>{hint}</small>
+        <span className="code-lang">{label}</span>
+        <b>{file}</b>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(text).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            });
+          }}
+        >
+          {copied ? "copied" : "copy"}
+        </button>
       </header>
-      <pre>{text}</pre>
-      <button
-        type="button"
-        className="term-link ink"
-        onClick={() => {
-          void navigator.clipboard?.writeText(text).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
-          });
-        }}
-      >
-        {copied ? "copied" : "copy"}
-      </button>
-    </div>
+      <pre>
+        <code>
+          {prompt && <i className="code-prompt">$ </i>}
+          {parts.map((part, i) => (
+            <span key={i}>
+              {part}
+              {i < parts.length - 1 && <mark>{mark}</mark>}
+            </span>
+          ))}
+        </code>
+      </pre>
+      <figcaption>{note}</figcaption>
+    </figure>
   );
 }

@@ -26,6 +26,7 @@ h1 .line > span {
   background: var(--paper);
 }
 .app-nav .nav-inner {
+  background: rgb(255 255 255 / 0.92);
   max-width: 1120px;
   height: 60px;
   margin-top: 10px;
@@ -96,6 +97,10 @@ h1 .line > span {
   font-size: clamp(56px, 6.2vw, 96px);
   line-height: 0.98;
   letter-spacing: -0.055em;
+}
+/* the headline waits for the owner's name on a first visit; hold its two lines so nothing jumps */
+.hero-greeting {
+  min-height: 1.96em;
 }
 .dash-hero .lede {
   max-width: 720px;
@@ -1194,36 +1199,125 @@ h2.section-title:not(.section-head *) {
   flex-direction: column;
   gap: 18px;
 }
-.snippet {
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--soft);
+/* long code lines scroll inside their block instead of stretching the column */
+.keys-grid > * {
+  min-width: 0;
 }
-.snippet header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.snippet header small {
-  font-weight: 400;
-  color: var(--muted);
-}
-.snippet pre {
+/* code blocks: a black terminal card, the same family as the agent console */
+.code {
   margin: 0;
-  overflow-x: auto;
+  border-radius: 16px;
+  background: var(--ink);
+  color: #f4f4f4;
+  overflow: hidden;
+}
+.code header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px 11px 16px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+  font-size: 13px;
+}
+.code header b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   font-family: var(--mono);
   font-size: 12px;
-  line-height: 1.5;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgb(255 255 255 / 0.75);
+}
+.code-lang {
+  padding: 1px 8px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 99px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--yellow);
+}
+.code header button {
+  padding: 3px 10px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 99px;
+  background: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.code header button:hover {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+.code pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+.code code {
+  font-family: inherit;
+}
+.code-prompt {
+  font-style: normal;
+  color: var(--yellow);
+  user-select: none;
+}
+.code mark {
+  padding: 0 0.25em;
+  border-radius: 4px;
+  background: rgb(255 212 0 / 0.18);
+  color: var(--yellow);
+}
+.code figcaption {
+  padding: 0 16px 13px;
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.5);
+}
+.code.secret {
+  background: var(--yellow);
+  color: var(--ink);
+}
+.code.secret header {
+  border-bottom-color: rgb(0 0 0 / 0.15);
+}
+.code.secret header b,
+.code.secret figcaption {
+  color: rgb(0 0 0 / 0.7);
+}
+.code.secret .code-lang,
+.code.secret header button {
+  border-color: rgb(0 0 0 / 0.35);
+  color: var(--ink);
+}
+.code.secret header button:hover {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #ffffff;
+}
+.code.secret pre {
+  font-size: 13.5px;
+  font-weight: 700;
   white-space: pre-wrap;
   word-break: break-all;
 }
-.snippet.secret {
-  border-color: var(--ink);
-  background: var(--yellow);
+.prove code {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--soft);
+  font-family: var(--mono);
+  font-size: 0.88em;
 }
 .acct dd .chip-scope {
   padding: 1px 8px;
@@ -1304,33 +1398,56 @@ h2.section-title:not(.section-head *) {
 
 /* ── small screens: dashboard + onboarding ─────────────────────────────── */
 @media (max-width: 760px) {
-  .app-nav {
-    height: auto;
-  }
-  .app-nav .nav-inner {
-    flex-wrap: wrap;
-    height: auto;
+  /* phone header: one quiet row on top, the four pages as a tab bar under the thumb */
+  .nav.pill.app-nav .nav-inner {
+    height: 52px;
     margin: 8px 12px 0;
-    padding: 10px 14px 0 18px;
-    gap: 0 12px;
-    border-radius: 22px;
+    padding: 0 16px 0 18px;
+    gap: 12px;
+    border-radius: 26px;
+    /* no backdrop-filter here: it would trap the fixed tab bar inside this pill */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgb(255 255 255 / 0.97);
   }
   .app-user {
     margin-left: auto;
-    gap: 10px;
+    gap: 12px;
+  }
+  .app-user > b,
+  .app-user > strong,
+  .app-user > span:not(.eyebrow) {
+    max-width: 40vw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .app-tabs {
-    order: 3;
-    width: 100%;
-    margin: 4px -6px 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    margin: 0;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    overflow: hidden; /* the active tab's yellow line sits on the bar's own edge */
+    background: rgb(255 255 255 / 0.96);
+    backdrop-filter: blur(22px) saturate(1.4);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -18px rgb(0 0 0 / 0.3);
   }
-  .app-tabs::-webkit-scrollbar {
-    display: none;
+  .app-tabs > div,
+  .app-tabs ul {
+    width: 100%;
+  }
+  .app-tabs li {
+    flex: 1 1 0;
+    text-align: center;
   }
   .app-tabs p {
-    padding: 8px 12px;
+    padding: 15px 4px;
     font-size: 14px;
   }
   .dash {
@@ -1338,15 +1455,15 @@ h2.section-title:not(.section-head *) {
   }
   .dash-main {
     gap: 48px;
-    padding: 0 16px 80px;
+    padding: 0 16px 120px; /* room for the tab bar */
   }
   /* Obsidian MagnetTabs rows scroll sideways instead of widening the page */
-  .dash .items-start.justify-start {
+  .dash-main .items-start.justify-start {
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .dash .items-start.justify-start::-webkit-scrollbar {
+  .dash-main .items-start.justify-start::-webkit-scrollbar {
     display: none;
   }
   .page-title h1,

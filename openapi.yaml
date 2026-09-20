@@ -381,8 +381,6 @@ components:
             enum:
               - read
               - pay
-              - fund
-              - admin
         ttlDays:
           nullable: true
           type: integer

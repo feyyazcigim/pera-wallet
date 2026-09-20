@@ -26,8 +26,7 @@ Try it: `hermes -z "Quote the price of http://<resource-server>/api/stellar/weat
 - Pays (`pay` scope): `pay_url` — only within the owner's rules (allowed chains, max per call, weekly limit, optional
   approval threshold) and the **on-chain daily cap** enforced by the smart account's policy contract. Refusals come
   back as `status: denied` / `requires_approval` (the human approves in the dashboard, the agent retries with `approval_id`).
-- Never: change rules or the cap, off-ramp, move funds out of the wallet, or fund it (`request_funding` only returns the
-  bank instructions for the human, and needs the `fund` scope).
+- Never: change rules or the cap, off-ramp, move funds out of the wallet, or fund it. Those stay with the owner, in the dashboard.
 
 Hermes asks before non-read tool calls (`pay_url`) unless you approve the tool for the session; read tools run freely.
 
