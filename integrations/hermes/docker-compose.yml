@@ -25,13 +25,13 @@ services:
     environment:
       HERMES_UID: ${HERMES_UID:-10000}
       HERMES_GID: ${HERMES_GID:-10000}
-      HERMES_MODEL: ${HERMES_MODEL:-us.anthropic.claude-sonnet-4-6}
+      HERMES_MODEL: ${HERMES_MODEL:-moonshotai.kimi-k2.5}
       # AWS Bedrock (the image ships boto3): either a Bedrock API key or IAM keys; region must have model access enabled.
       AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS}
       PERA_AGENT_TOKEN: ${PERA_AGENT_TOKEN}

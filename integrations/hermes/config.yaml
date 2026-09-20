@@ -5,7 +5,7 @@
 # Region: Hermes/boto3 resolve AWS_REGION -> AWS_DEFAULT_REGION -> us-east-1 (no `bedrock.region` here on purpose).
 model:
   provider: "bedrock"
-  default: "us.anthropic.claude-sonnet-4-6"   # cross-region inference profile id from the Bedrock console; HERMES_MODEL env overrides
+  default: "moonshotai.kimi-k2.5"   # Kimi K2.5 (Converse + tool use; in-region only, no us./global. prefix); HERMES_MODEL env overrides
 
 platforms:
   telegram:
