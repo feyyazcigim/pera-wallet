@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-label="pera.">
+  <rect width="1280" height="400" rx="28" fill="#FFD400"/>
+  <!-- the passage symbol: one arch, one coin at street level -->
+  <g transform="translate(258 84) scale(6.2)">
+    <path fill="#0A0A0A" d="M 0 36 L 0 16 A 16 16 0 0 1 32 16 L 32 36 L 25.5 36 L 25.5 16 A 9.5 9.5 0 0 0 6.5 16 L 6.5 36 Z"/>
+    <circle cx="16" cy="29.5" r="6" fill="#0A0A0A"/>
+  </g>
+  <!-- wordmark -->
+  <text x="506" y="296" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="236" letter-spacing="-13" fill="#0A0A0A">pera</text>
+  <circle cx="992" cy="268" r="30" fill="#0A0A0A"/>
+</svg>
