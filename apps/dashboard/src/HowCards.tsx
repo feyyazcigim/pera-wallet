@@ -17,7 +17,7 @@ const STEPS: { n: string; title: string; body: string; tag: string; Visual: () =
     body: "USDC is deposited into a yield vault automatically. Your balance never sits idle." },
   { n: "04", title: "Your agent pays its own way", tag: "x402 · Soroban", Visual: PaymentsVisual,
     body: "The agent settles API calls over x402, per request, inside the limits you set on-chain." },
-  { n: "05", title: "One vault, Stellar or Base", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
+  { n: "05", title: "One vault, any chain", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
     body: "Lira comes in once and becomes USDC on Stellar. Paywalls on Stellar are paid natively. When one lives on Base, Circle CCTP burns that USDC on Stellar and mints it there. No bridges, no wrapped tokens, the same rules." },
 ];
 
