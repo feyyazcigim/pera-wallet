@@ -4,7 +4,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
   const config = {
     url: mcpUrl,
     headers: { Authorization: "Bearer ${PERA_AGENT_TOKEN}" },
-    timeout: 120,
+    timeout: 300,
     connect_timeout: 30,
     tools: { include: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "request_funding"], resources: false, prompts: false },
   };
@@ -15,7 +15,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
     `    url: "${mcpUrl}"`,
     "    headers:",
     '      Authorization: "Bearer ${PERA_AGENT_TOKEN}"',
-    "    timeout: 120              # pay_url may bridge via CCTP (> 60 s)",
+    "    timeout: 300              # a Base payment bridges via CCTP first (1–3 min)",
     "    connect_timeout: 30",
     "    tools:",
     "      include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]",
