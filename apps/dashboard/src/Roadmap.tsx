@@ -15,8 +15,6 @@ const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", 
 const VOLUME: { net: string; usdc: number | null; payments: number | null }[] = [
   { net: "Base", usdc: 13708, payments: 65745 },
   { net: "Solana", usdc: 1460, payments: 17181 },
-  { net: "Polygon", usdc: 0, payments: 0 },
-  { net: "Optimism", usdc: 0, payments: 0 },
   { net: "Stellar", usdc: null, payments: null },
 ];
 const TOP = 15000;
@@ -176,7 +174,7 @@ function VolumeChart() {
           </tbody>
         </table>
       ) : (
-        <div className="rm-cols" role="img" aria-label="Column chart. Base 13,708 USDC, Solana 1,460, Polygon 0, Optimism 0. Stellar is not indexed yet and is drawn with room to grow.">
+        <div className="rm-cols" role="img" aria-label="Column chart. Base 13,708 USDC, Solana 1,460. Stellar is not indexed yet and is drawn with room to grow.">
           <div className="rm-grid" aria-hidden="true">
             {[1, 0.5, 0].map((f) => (
               <span key={f} style={{ bottom: `calc(34px + ${f} * (100% - 34px))` }}>

@@ -1176,7 +1176,7 @@ section[id] {
 .rm-cols {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px;
   height: 420px;
   margin-top: 40px;
@@ -1221,7 +1221,7 @@ section[id] {
 }
 .rm-bar {
   position: relative;
-  width: min(72px, 60%);
+  width: min(96px, 60%);
   border-radius: 6px 6px 0 0;
   background: var(--ink);
 }
@@ -1254,7 +1254,7 @@ section[id] {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: min(72px, 60%);
+  width: min(96px, 60%);
   height: 91.4%;
   transform: translateX(-50%);
   border: 1.5px dashed var(--ink);

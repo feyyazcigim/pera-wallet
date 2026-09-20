@@ -20,7 +20,7 @@
 
 ## What it is
 
-AI agents have started paying for things: API calls, data, compute. Today you either hand an agent a key with no real limit, or you approve every payment by hand. Money set aside for the agent earns nothing, and from Türkiye even reaching USDC still means an exchange account and a seed phrase.
+AI agents have started paying for things: API calls, data, compute. Today you either hand an agent a key with no real limit, or you approve every payment by hand. Money set aside for the agent earns nothing, and getting from a bank account to USDC still means an exchange account and a seed phrase.
 
 pera. closes those gaps in one product:
 
@@ -36,7 +36,7 @@ Everything runs on Stellar testnet and Base Sepolia with real transactions. Trac
 
 ```mermaid
 flowchart LR
-  Bank["Turkish bank<br/>TRY transfer"] --> Anchor["Stellar anchor<br/>SEP-6 · SEP-10 · SEP-38"]
+  Bank["Bank<br/>TRY transfer"] --> Anchor["Stellar anchor<br/>SEP-6 · SEP-10 · SEP-38"]
   Anchor -->|USDC| Treasury["Treasury account<br/>sponsored, holds no XLM"]
   Treasury <-->|deposit · instant withdraw| Vault["DeFindex vault<br/>earning"]
   Treasury --> Smart["Smart account<br/>owner: passkey<br/>agent rule: daily + weekly cap"]
