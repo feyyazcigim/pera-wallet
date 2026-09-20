@@ -47,7 +47,7 @@ YIELD_RESERVE_USDC=5
 AUTOPILOT=on
 LOG_LEVEL=info
 # optional
-DEFINDEX_API_KEY=sk_…
+DEFINDEX_API_KEY=sk_…                # optional; with it the API creates the DeFindex vault at first boot and stores the id in Postgres
 VAULT_ID=
 RESOURCE_SERVER_URL=            # only if you deploy the demo paywalls (step 4)
 ```

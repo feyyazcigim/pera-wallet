@@ -512,3 +512,15 @@ export async function consumeApproval(userId: string, id: string): Promise<boole
   const rows = await db.query("update approvals set status = 'consumed', consumed_at = now() where id = $1 and user_id = $2 and status = 'approved' returning id", [id, userId]);
   return rows.length > 0;
 }
+
+// ---------------------------------------------------------------------------- settings (deployment-wide key/value)
+export async function getSetting(key: string): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.query("select value from settings where key = $1", [key]);
+  return (rows[0]?.value as string | undefined) ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  await db.query("insert into settings (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value, updated_at = now()", [key, value]);
+}

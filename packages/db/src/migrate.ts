@@ -117,6 +117,12 @@ const STATEMENTS = [
      consumed_at timestamptz
    )`,
   `create index if not exists approvals_user_status on approvals (user_id, status, created_at desc)`,
+  // deployment-wide values created at runtime (e.g. the DeFindex vault id) — survive redeploys, unlike the container env
+  `create table if not exists settings (
+     key text primary key,
+     value text not null,
+     updated_at timestamptz not null default now()
+   )`,
 ];
 
 let done: Promise<void> | undefined;

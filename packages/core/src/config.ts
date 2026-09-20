@@ -109,6 +109,12 @@ export function loadEnv(): Env {
   return cachedEnv;
 }
 
+/** Adopt a vault id discovered/created at runtime (the API stores it in the database, not in .env). */
+export function applyVaultId(vaultId: string): void {
+  process.env.VAULT_ID = vaultId;
+  cachedEnv = undefined;
+}
+
 /** Forget the cached env (after bootstrap writes new ids into .env). */
 export function reloadEnv(): Env {
   cachedEnv = undefined;

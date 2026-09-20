@@ -16,10 +16,12 @@ import { eventRoutes } from "./routes/events";
 import { meRoutes } from "./routes/me";
 import { statusRoutes } from "./routes/status";
 import { yieldRoutes } from "./routes/yield";
+import { provisionVault } from "./vault";
 
 export async function buildApp(): Promise<FastifyInstance> {
   loadEnv();
   await migrate();
+  void provisionVault().catch((err: Error) => console.error(`[api.vault] vault provisioning failed: ${err.message}`));
   events.setSink((e) => insertEvent({ id: e.id, userId: e.userId ?? null, ts: e.ts, type: e.type, amountUsdc: e.amountUsdc, network: e.network, txHash: e.txHash, explorerUrl: e.explorerUrl, detail: e.detail }));
 
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info", base: undefined }, disableRequestLogging: true, bodyLimit: 256 * 1024 });
