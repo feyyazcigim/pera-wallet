@@ -24,7 +24,6 @@ export function Onboard() {
   const nav = useNavigate();
   const [phase, setPhase] = useState<Phase>("idle");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const supported = browserSupportsWebAuthn();
@@ -49,7 +48,7 @@ export function Onboard() {
     session.setDemo(kind === "demo");
     setPhase("checking");
     try {
-      const who = { displayName: name.trim() || "Pera user", email: email.trim() || undefined };
+      const who = { displayName: name.trim() || "Pera user" };
       const token = kind === "other" ? await api().login() : await api().enter(who, () => setPhase("creating"));
       session.setToken(kind === "demo" ? null : token);
       nav("/app", { replace: true });
@@ -125,12 +124,6 @@ export function Onboard() {
                 <label>
                   What should we call you?
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ayşe" autoComplete="name" autoFocus />
-                </label>
-                <label>
-                  <span>
-                    Email <em>optional</em>
-                  </span>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
                 </label>
                 <ArrowFillButton as="button" type="submit" className="lg" disabled={!supported || busy} {...BTN}>
                   {busy ? "Waiting for your passkey…" : "Continue"}
