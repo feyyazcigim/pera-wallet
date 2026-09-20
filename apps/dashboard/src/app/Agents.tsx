@@ -71,7 +71,6 @@ export function Agents() {
             <div className="rulecard">
               <header>
                 <span>new key</span>
-                <em>{fresh ? "shown once, copy it now" : "read + pay is all an agent needs"}</em>
               </header>
               <div className="row field">
                 <div>
@@ -108,38 +107,38 @@ export function Agents() {
             {note && <p className="rule-note err">{note}</p>}
           </form>
           {fresh && <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />}
-          <section className="keys-list">
-            <h2 className="section-title">Your keys</h2>
-            <dl className="accounts">
-              {keys === null && <div className="acct skeleton" />}
-              {keys?.length === 0 && <p className="muted">No keys yet.</p>}
-              {keys?.map((k) => (
-                <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
-                  <dt>
-                    {k.name}
-                    <small>
-                      created {timeAgo(k.createdAt)}
-                      {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
-                      {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
-                      {k.revokedAt ? " · revoked" : ""}
-                    </small>
-                  </dt>
-                  <dd className="mono">
-                    {k.scopes.map((s) => (
-                      <span key={s} className="chip-scope">
-                        {s}
-                      </span>
-                    ))}
-                    {!k.revokedAt && (
-                      <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
-                        {busy === k.id ? "revoking…" : "revoke"}
-                      </button>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+          <div className="keys-list">
+          <h2 className="section-title">Your keys</h2>
+          <dl className="accounts">
+            {keys === null && <div className="acct skeleton" />}
+            {keys?.length === 0 && <p className="muted">No keys yet.</p>}
+            {keys?.map((k) => (
+              <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
+                <dt>
+                  {k.name}
+                  <small>
+                    created {timeAgo(k.createdAt)}
+                    {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
+                    {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
+                    {k.revokedAt ? " · revoked" : ""}
+                  </small>
+                </dt>
+                <dd className="mono">
+                  {k.scopes.map((s) => (
+                    <span key={s} className="chip-scope">
+                      {s}
+                    </span>
+                  ))}
+                  {!k.revokedAt && (
+                    <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
+                      {busy === k.id ? "revoking…" : "revoke"}
+                    </button>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          </div>
         </div>
 
         <aside className="keys-right">
@@ -157,27 +156,32 @@ const CLIENTS = ["Claude Code", "Hermes", "Any MCP client"];
 function Connect({ kit, token }: { kit: ReturnType<typeof connectKit>; token: string }) {
   const [client, setClient] = useState(CLIENTS[0]);
   return (
-    <figure className="code connect">
-      <div className="term-tabs">
+    <div className="rulecard connect">
+      <header>
+        <span>connect</span>
+      </header>
+      <div className="connect-tabs">
         <MagnetTabs slug="connect" options={CLIENTS} activeTab={client} onSelect={setClient} />
       </div>
-      {client === "Claude Code" && <Code label="shell" file="run once in your terminal" text={kit.claudeCode} mark={token} prompt />}
-      {client === "Hermes" && (
-        <>
-          <Code label="env" file="~/.hermes/.env" text={kit.envLine} mark={token} />
-          <Code label="yaml" file="~/.hermes/config.yaml" text={kit.snippetYaml} />
-        </>
-      )}
-      {client === "Any MCP client" && <Code label="http" file="Streamable HTTP" text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />}
-      <figcaption>
+      <div className="connect-body">
+        {client === "Claude Code" && <Code label="shell" file="run once in your terminal" text={kit.claudeCode} mark={token} prompt />}
         {client === "Hermes" && (
-          <a href="https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes" target="_blank" rel="noreferrer">
-            Integration guide ↗
+          <>
+            <Code label="env" file="~/.hermes/.env" text={kit.envLine} mark={token} />
+            <Code label="yaml" file="~/.hermes/config.yaml" text={kit.snippetYaml} />
+          </>
+        )}
+        {client === "Any MCP client" && <Code label="http" file="Streamable HTTP" text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />}
+      </div>
+      <div className="row save-row connect-foot">
+        <small>{client === "Hermes" ? "The same two files work for the hosted bot." : client === "Claude Code" ? "Claude Code can then quote and pay paywalls from this wallet." : "Send the key as a Bearer token on every request."}</small>
+        {client === "Hermes" && (
+          <a className="term-link ink" href="https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes" target="_blank" rel="noreferrer">
+            integration guide ↗
           </a>
         )}
-        {client === "Hermes" ? "The same two files work for the hosted bot." : client === "Claude Code" ? "Claude Code can then quote and pay paywalls from this wallet." : "Send the key as a Bearer token on every request."}
-      </figcaption>
-    </figure>
+      </div>
+    </div>
   );
 }
 

@@ -1643,3 +1643,113 @@ h2.section-title:not(.section-head *) {
     justify-content: center;
   }
 }
+
+/* ── agents: the connect card is the form card's sibling: black strip, white body, soft footer.
+   Both start on the same line; the card keeps one height whichever client is picked, and the keys list
+   simply runs on under the form. Nothing is stretched to fill space. ── */
+.keys-grid {
+  align-items: start;
+}
+.keys-left {
+  gap: 28px;
+}
+.keys-right {
+  position: static;
+}
+.connect-tabs {
+  padding: 14px 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+/* sized for the longest tab (Hermes), so the card keeps one height whichever client is picked */
+.connect-body {
+  min-height: 318px;
+}
+.connect .code-part header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 22px 0;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+}
+.connect .code-part header b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+.connect .code-lang {
+  padding: 1px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 99px;
+  background: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--yellow);
+}
+.connect .code-part header button {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.connect .code-part header button:hover {
+  border-color: var(--ink);
+  background: var(--yellow);
+}
+.connect .code-part + .code-part {
+  margin-top: 4px;
+  border-top: 0;
+}
+.connect pre {
+  margin: 10px 22px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--ink);
+}
+.connect pre code {
+  font-family: inherit;
+}
+.connect .code-prompt {
+  color: var(--muted);
+}
+.connect mark {
+  margin: 0 -3px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: var(--yellow);
+  color: var(--ink);
+}
+.connect-foot {
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.connect-foot small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .connect-body {
+    min-height: 0;
+  }
+}
