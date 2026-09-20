@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { EASE, Hl, Line } from "../ui";
+import { toast } from "../toast";
 import { api, ApiError, session } from "./api";
 
 /** What the API does during the single sign-up request (guide §5.1) — shown while we wait ~30 s. */
@@ -15,18 +16,17 @@ const PROVISION_STEPS = [
   { label: "Creating your EVM wallet", hint: "For paywalls on other chains, through Circle CCTP." },
 ];
 const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", fillTextColor: "#0a0a0a", hoverFillBgColor: "#ffd400", hoverFillTextColor: "#0a0a0a" };
-/** idle → checking (is there a passkey on this device?) → creating (no: provision a wallet) */
-type Phase = "idle" | "checking" | "creating";
+/** idle → checking (is there a passkey on this device?) → name (no: who is this?) → creating (provision the wallet) */
+type Phase = "idle" | "checking" | "name" | "creating";
 
 export function Onboard() {
   const nav = useNavigate();
   const [phase, setPhase] = useState<Phase>("idle");
   const [name, setName] = useState("");
   const [step, setStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const supported = browserSupportsWebAuthn();
-  const stepMs = session.isDemo() ? 800 : 6000;
-  const busy = phase !== "idle";
+  const stepMs = 6000;
+  const busy = phase === "checking" || phase === "creating";
 
   useEffect(() => {
     if (session.exists()) nav("/app", { replace: true });
@@ -39,23 +39,37 @@ export function Onboard() {
     return () => clearInterval(t);
   }, [phase, stepMs]);
 
-  /** One button. `other` is the quiet link for a passkey that lives on another device (phone, security key). */
-  async function run(kind: "enter" | "other" | "demo") {
-    setError(null);
-    setStep(0);
-    session.setDemo(kind === "demo");
+  const fail = (e: unknown, back: Phase) => {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (e instanceof ApiError && (e.code === "UNKNOWN_CREDENTIAL" || e.code === "UNKNOWN_USER")) toast("We don't know that passkey. Press Continue to set up a wallet.", "err");
+    else toast(/NotAllowedError|timed out|not allowed/i.test(`${(e as Error)?.name} ${msg}`) ? "The passkey prompt was dismissed. Try again when you're ready." : msg, "err");
+    setPhase(back);
+  };
+
+  /**
+   * One Continue. Someone whose passkey is on this device is signed in and never sees a form; only a new person is
+   * asked their name. `other` is the quiet link for a passkey that lives on a phone or a security key.
+   */
+  async function enter(kind: "here" | "other") {
+    session.setDemo(false);
     setPhase("checking");
     try {
-      const who = { displayName: name.trim() || "Pera user" };
-      const token = kind === "other" ? await api().login() : await api().enter(who, () => setPhase("creating"));
-      session.setToken(kind === "demo" ? null : token);
+      const token = kind === "other" ? await api().login() : await api().signInIfKnown();
+      if (token === null) return setPhase("name");
+      session.setToken(token);
       nav("/app", { replace: true });
     } catch (e) {
-      session.setDemo(false);
-      const msg = e instanceof Error ? e.message : String(e);
-      if (e instanceof ApiError && (e.code === "UNKNOWN_CREDENTIAL" || e.code === "UNKNOWN_USER")) setError("We don't know that passkey. Press Continue to create a wallet.");
-      else setError(/NotAllowedError|timed out|not allowed/i.test(`${(e as Error)?.name} ${msg}`) ? "The passkey prompt was dismissed. Try again when you're ready." : msg);
-      setPhase("idle");
+      fail(e, "idle");
+    }
+  }
+  async function create() {
+    setStep(0);
+    setPhase("creating");
+    try {
+      session.setToken(await api().register({ displayName: name.trim() || "Pera user" }));
+      nav("/app", { replace: true });
+    } catch (e) {
+      fail(e, "name");
     }
   }
 
@@ -106,39 +120,52 @@ export function Onboard() {
             </motion.div>
           ) : (
             <motion.div key="form" className="onb-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run("enter");
-                }}
-              >
-                <h2>
-                  Welcome to <mark>pera</mark>.
-                </h2>
-                <p className="muted onb-lead">One passkey prompt. If this device already has a wallet you're signed in, otherwise we create one for you.</p>
-                <label>
-                  What should we call you?
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ayşe" autoComplete="name" autoFocus />
-                </label>
-                <ArrowFillButton as="button" type="submit" className="lg" disabled={!supported || busy} {...BTN}>
-                  {busy ? "Waiting for your passkey…" : "Continue"}
-                </ArrowFillButton>
-              </form>
+              {phase === "name" ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void create();
+                  }}
+                >
+                  <h2>
+                    What should we <mark>call you</mark>?
+                  </h2>
+                  <p className="muted onb-lead">No wallet on this device yet, so we'll set one up. One passkey prompt and it's yours.</p>
+                  <label>
+                    Your name
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ayşe" autoComplete="name" autoFocus />
+                  </label>
+                  <ArrowFillButton as="button" type="submit" className="lg" disabled={!supported} {...BTN}>
+                    Create my wallet
+                  </ArrowFillButton>
+                </form>
+              ) : (
+                <div className="onb-login">
+                  <h2>
+                    Welcome to <mark>pera</mark>.
+                  </h2>
+                  <p className="muted onb-lead">One press. If this device already has a wallet you're signed in, otherwise we set one up for you.</p>
+                  <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void enter("here")} {...BTN}>
+                    {busy ? "Waiting for your passkey…" : "Continue"}
+                  </ArrowFillButton>
+                </div>
+              )}
 
               {!supported && <p className="onb-error">This browser doesn't support passkeys. Try Safari or Chrome on a device with Touch ID / Face ID.</p>}
-              {error && <p className="onb-error">{error}</p>}
 
               <p className="onb-demo">
-                Passkey on your phone or a security key?{" "}
-                <button type="button" disabled={busy} onClick={() => void run("other")}>
-                  Sign in with it
-                </button>
-              </p>
-              <p className="onb-demo quiet">
-                No backend running?{" "}
-                <button type="button" disabled={busy} onClick={() => void run("demo")}>
-                  Look around with demo data
-                </button>
+                {phase === "name" ? (
+                  <button type="button" onClick={() => setPhase("idle")}>
+                    ← back
+                  </button>
+                ) : (
+                  <>
+                    Passkey on your phone or a security key?{" "}
+                    <button type="button" disabled={busy} onClick={() => void enter("other")}>
+                      Sign in with it
+                    </button>
+                  </>
+                )}
               </p>
             </motion.div>
           )}

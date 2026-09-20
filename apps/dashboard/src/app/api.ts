@@ -91,10 +91,10 @@ export class RuleViolationError extends ApiError {}
 export interface Backend {
   register(input: { displayName: string; email?: string; dailyCapUsdc?: number }): Promise<string>; // → session token
   /**
-   * One button for everyone: a passkey that already lives on this device signs in, otherwise a wallet is created.
-   * `onCreating` fires when it turns out to be a new wallet, right before the (long) provisioning request.
+   * The first half of the single Continue button: if a passkey for us already lives on this device, sign in with it
+   * and return the session token. `null` means there is none here, so this is a new person: ask their name, then `register`.
    */
-  enter(input: { displayName: string; email?: string }, onCreating: () => void): Promise<string>;
+  signInIfKnown(): Promise<string | null>;
   login(): Promise<string>;
   logout(): Promise<void>;
   me(): Promise<Me>;
@@ -303,10 +303,10 @@ const httpBackend: Backend = {
   /**
    * Browsers never say whether a passkey exists, but "immediate mediation" comes close: `get()` fails at once,
    * with no dialog, when this device holds no passkey for us, and shows the usual picker when it does.
-   * So: try that first; nothing there means a new wallet. Browsers without it fall back to the hint this
+   * So: try that first; nothing there means a new person. Browsers without it fall back to the hint this
    * browser keeps from its last visit.
    */
-  async enter(input, onCreating) {
+  async signInIfKnown() {
     type Caps = { immediateGet?: boolean };
     type PKC = typeof PublicKeyCredential & { getClientCapabilities?: () => Promise<Caps>; parseRequestOptionsFromJSON?: (o: unknown) => PublicKeyCredentialRequestOptions };
     const pkc = typeof PublicKeyCredential === "undefined" ? undefined : (PublicKeyCredential as PKC);
@@ -338,8 +338,7 @@ const httpBackend: Backend = {
         session.forgetPasskey(); // stale hint (other server, wiped database): this is a new wallet after all
       }
     }
-    onCreating();
-    return this.register(input);
+    return null;
   },
   async logout() {
     await http("/auth/logout", { method: "POST", body: {} }).catch(() => undefined);

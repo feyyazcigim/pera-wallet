@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
+import { toast } from "../toast";
 import { Rise } from "../ui";
 import { api, NETWORKS, session } from "./api";
 import { usd, useApp } from "./store";
@@ -27,7 +28,6 @@ export function Rules() {
   );
   const [form, setForm] = useState<Form | null>(null);
   const [busy, setBusy] = useState<null | "save" | "prove" | "sweep">(null);
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => {
     if (saved && !form) setForm(saved);
   }, [saved, form]);
@@ -46,7 +46,6 @@ export function Rules() {
     e.preventDefault();
     if (!form || !saved || !me) return;
     setBusy("save");
-    setNote(null);
     try {
       // every change is approved by the owner's passkey. Daily and weekly limits are each a signed on-chain transaction
       // (the first one carries the router rules with it); with neither, the passkey signs the new ruleset itself.
@@ -59,10 +58,10 @@ export function Rules() {
       await refresh();
       setForm(null);
       const onchain = dailyChanged && weeklyChanged ? "daily and weekly limits are" : dailyChanged ? "daily limit is" : "weekly limit is";
-      setNote({ ok: true, text: dailyChanged || weeklyChanged ? `Saved with your passkey. The new ${onchain} written to the policy contract, and the router enforces the rest from now on.` : "Saved with your passkey. The router enforces these on the agent's next payment." });
+      toast(dailyChanged || weeklyChanged ? `Saved with your passkey. The new ${onchain} written to the policy contract, and the router enforces the rest from now on.` : "Saved with your passkey. The router enforces these on the agent's next payment.", "ok");
     } catch (err) {
       await refresh();
-      setNote({ ok: false, text: err instanceof Error ? err.message : String(err) });
+      toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
     }
@@ -70,24 +69,22 @@ export function Rules() {
   async function enableSweep() {
     if (!me) return;
     setBusy("sweep");
-    setNote(null);
     try {
       await api().enableAutoSweep(me);
       await refresh();
-      setNote({ ok: true, text: "Auto-sweep is on. USDC sent to your smart account now moves to the treasury and the vault by itself; one day of agent budget stays on hand." });
+      toast("Auto-sweep is on. USDC sent to your smart account now moves to the treasury and the vault by itself; one day of agent budget stays on hand.", "ok");
     } catch (err) {
-      setNote({ ok: false, text: err instanceof Error ? err.message : String(err) });
+      toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
     }
   }
   async function prove() {
     setBusy("prove");
-    setNote(null);
     try {
-      setNote({ ok: true, text: await api().overCapDemo() });
+      toast(await api().overCapDemo(), "ok");
     } catch (err) {
-      setNote({ ok: false, text: err instanceof Error ? err.message : String(err) });
+      toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
       void refresh();
@@ -131,7 +128,6 @@ export function Rules() {
             </div>
           </div>
           {dailyChanged && weeklyChanged && busy === null && <p className="rule-note">Two contract changes, so your passkey is asked twice.</p>}
-          {note && <p className={`rule-note ${note.ok ? "ok" : "err"}`}>{note.text}</p>}
         </form>
 
         <aside className="rules-usage">

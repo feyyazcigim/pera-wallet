@@ -130,9 +130,8 @@ export const demoBackend: Backend = {
     await wait(600);
     return "demo";
   },
-  async enter(input, onCreating) {
-    onCreating();
-    return this.register(input);
+  async signInIfKnown() {
+    return null;
   },
   async logout() {},
   async me() {

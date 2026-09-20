@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './index.css'
 import './app/app.css'
 import Landing from './App.tsx'
+import { Toaster } from './toast.tsx'
 
 // the dashboard is a separate chunk — the landing page doesn't pay for it
 const Shell = lazy(() => import('./app/Shell.tsx').then((m) => ({ default: m.Shell })))
@@ -15,6 +16,7 @@ const Analytics = lazy(() => import('./app/Analytics.tsx').then((m) => ({ defaul
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <Toaster />
     <BrowserRouter>
       <Suspense fallback={null}>
         <Routes>

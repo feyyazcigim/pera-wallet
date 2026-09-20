@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
+import { toast } from "../toast";
 import { Rise } from "../ui";
 import { api, connectKit, SCOPES, type AgentKey, type AgentScope } from "./api";
 import { timeAgo } from "./store";
@@ -14,13 +15,12 @@ export function Agents() {
   const [scopes, setScopes] = useState<AgentScope[]>(["read", "pay"]);
   const [busy, setBusy] = useState<null | "create" | string>(null);
   const [fresh, setFresh] = useState<{ key: AgentKey; secret: string } | null>(null);
-  const [note, setNote] = useState<string | null>(null);
 
   async function load() {
     try {
       setKeys(await api().agentKeys());
     } catch (err) {
-      setNote(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), "err");
     }
   }
   useEffect(() => {
@@ -31,13 +31,12 @@ export function Agents() {
     e.preventDefault();
     if (!name.trim() || scopes.length === 0) return;
     setBusy("create");
-    setNote(null);
     try {
       const r = await api().createAgentKey({ name: name.trim(), scopes });
       setFresh(r);
       await load();
     } catch (err) {
-      setNote(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
     }
@@ -49,7 +48,7 @@ export function Agents() {
       if (fresh?.key.id === id) setFresh(null);
       await load();
     } catch (err) {
-      setNote(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
     }
@@ -102,7 +101,6 @@ export function Agents() {
                 </ArrowFillButton>
               </div>
             </div>
-            {note && <p className="rule-note err">{note}</p>}
           </form>
         </div>
 
