@@ -34,8 +34,8 @@ Try it: `hermes -z "Quote the price of http://<resource-server>/api/stellar/weat
 ## Run Hermes on a server (Dokploy, Telegram bot)
 
 `docker-compose.yml` in this folder runs the official `nousresearch/hermes-agent` image as `hermes gateway` as a Telegram bot with the
-Pera MCP server pre-configured (`config.yaml` is seeded into the persistent `/opt/data` volume on first boot, together
-with the `payments/pera-wallet` skill).
+Pera MCP server pre-configured: `/opt/data/config.yaml` is generated from the environment on every boot (model,
+MCP URL, token), and the `payments/pera-wallet` skill is copied in.
 
 1. Telegram: create a bot with @BotFather (token), get your numeric user id from @userinfobot.
 2. Pera dashboard → *Connect an agent* → copy the `pat_…` token (read + pay).
@@ -54,9 +54,10 @@ with the `payments/pera-wallet` skill).
    The model provider is AWS Bedrock (`model.provider: bedrock` in `config.yaml`; the Hermes image includes boto3).
    IAM keys need `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`.
    No domain is needed (Telegram long-polling). Deploy, then message the bot: "what's my wallet balance?".
-4. Later changes: the live config is `/opt/data/config.yaml` inside the `hermes-data` volume (Dokploy → Compose →
-   Terminal). Deleting it and redeploying re-seeds from this folder. `trust: trusted` means no chat approval before
-   `pay_url` — the on-chain cap and router rules still apply; switch to `untrusted` to be asked every time.
+4. Later changes: edit the env in Dokploy (model, token, MCP URL) or the YAML block in `docker-compose.yml`, then
+   redeploy — the file in the volume is overwritten on boot. `trust: trusted` means no chat approval before `pay_url`
+   — the on-chain cap and router rules still apply; switch to `untrusted` to be asked every time. The boot log prints
+   `[pera] config.yaml written: …` so you can see what Hermes was given.
 
 ## Alternatives
 - **stdio** (clients without remote MCP): `npx -y @pera/mcp` with `PERA_API_URL` + `PERA_AGENT_TOKEN` (see `apps/mcp-shim`).

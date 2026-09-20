@@ -1,8 +1,10 @@
 # Hermes Agent as a Telegram bot wired to Pera's MCP server — Dokploy "Compose" service.
 #   Compose Path: ./integrations/hermes/docker-compose.yml (GitHub provider, branch main)
 #   Environment tab: AWS_BEARER_TOKEN_BEDROCK (or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY), AWS_REGION, HERMES_MODEL,
-#                    TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram long-polls.
+#                    TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN, PERA_MCP_URL. No domain/port: Telegram long-polls.
 # Uses the official image (docker.io/nousresearch/hermes-agent, ~1 GB pull) — nothing is built on the server.
+# Config-as-code: /opt/data/config.yaml is rewritten from the environment on EVERY boot (no seeding, nothing to edit by
+# hand in the volume). Change the env in Dokploy or the block below and redeploy.
 services:
   hermes:
     image: nousresearch/hermes-agent:v2026.9.14   # pin; bump deliberately (`:latest` tracks main)
@@ -10,16 +12,35 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        # First boot only: seed config.yaml + the Pera skill into the persistent HERMES_HOME (/opt/data).
-        if [ ! -f /opt/data/config.yaml ]; then
-          cp /opt/seed/config.yaml /opt/data/config.yaml
-          chown "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/config.yaml 2>/dev/null || true
-        fi
-        if [ ! -d /opt/data/skills/payments/pera-wallet ]; then
-          mkdir -p /opt/data/skills/payments
+        set -e
+        mkdir -p /opt/data/skills/payments
+        cat > /opt/data/config.yaml <<EOF
+        model:
+          provider: "bedrock"
+          default: "$${HERMES_MODEL}"
+        platforms:
+          telegram:
+            enabled: true
+        mcp_servers:
+          pera_wallet:
+            url: "$${PERA_MCP_URL}"
+            headers:
+              Authorization: "Bearer $${PERA_AGENT_TOKEN}"
+            trust: trusted              # bot mode: no per-call approval; the on-chain cap + router rules bound pay_url
+            timeout: 120                # pay_url may bridge via CCTP (> 60 s)
+            keepalive_interval: 60
+            protocol: auto              # stateless Streamable HTTP
+            tools:
+              include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]
+              resources: false
+              prompts: false
+        EOF
+        if [ -d /opt/seed/skills/payments/pera-wallet ]; then
+          rm -rf /opt/data/skills/payments/pera-wallet
           cp -r /opt/seed/skills/payments/pera-wallet /opt/data/skills/payments/
-          chown -R "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/skills 2>/dev/null || true
         fi
+        chown -R "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/config.yaml /opt/data/skills 2>/dev/null || true
+        echo "[pera] config.yaml written: provider=bedrock model=$${HERMES_MODEL} region=$${AWS_REGION} mcp=$${PERA_MCP_URL} token=$${PERA_AGENT_TOKEN%%_*}_…"
         exec /opt/hermes/docker/entrypoint-dispatch.sh gateway run
     environment:
       HERMES_UID: ${HERMES_UID:-10000}
@@ -38,7 +59,6 @@ services:
       TERMINAL_ENV: local
     volumes:
       - hermes-data:/opt/data
-      - ./config.yaml:/opt/seed/config.yaml:ro
       - ./skills:/opt/seed/skills:ro
 
 volumes:
