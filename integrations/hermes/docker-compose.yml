@@ -14,10 +14,22 @@ services:
       - |
         set -e
         mkdir -p /opt/data/skills/payments
+        # Model route. Default "bedrock-openai": Bedrock's OpenAI-compatible endpoint (needs AWS_BEARER_TOKEN_BEDROCK) —
+        # Hermes' most mature tool-calling path; the native Converse route ("bedrock", IAM keys OK) broke on Kimi with
+        # "toolResult blocks exceed toolUse blocks". HERMES_PROVIDER=bedrock switches back.
+        if [ "$${HERMES_PROVIDER:-bedrock-openai}" = "bedrock" ]; then
+          MODEL_BLOCK="model:
+          provider: \"bedrock\"
+          default: \"$${HERMES_MODEL}\""
+        else
+          MODEL_BLOCK="model:
+          provider: \"custom\"
+          default: \"$${HERMES_MODEL}\"
+          base_url: \"$${HERMES_BASE_URL:-https://bedrock-runtime.$${AWS_REGION}.amazonaws.com/openai/v1}\"
+          api_key: \"$${AWS_BEARER_TOKEN_BEDROCK}\""
+        fi
         cat > /opt/data/config.yaml <<EOF
-        model:
-          provider: "bedrock"
-          default: "$${HERMES_MODEL}"
+        $${MODEL_BLOCK}
         platforms:
           telegram:
             enabled: true
@@ -38,12 +50,14 @@ services:
           cp -r /opt/seed/skills/payments/pera-wallet /opt/data/skills/payments/
         fi
         chown -R "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/config.yaml /opt/data/skills 2>/dev/null || true
-        echo "[pera] config.yaml written: provider=bedrock model=$${HERMES_MODEL} region=$${AWS_REGION} mcp=$${PERA_MCP_URL} token=$${PERA_AGENT_TOKEN%%_*}_…"
+        echo "[pera] config.yaml written: route=$${HERMES_PROVIDER:-bedrock-openai} model=$${HERMES_MODEL} region=$${AWS_REGION} mcp=$${PERA_MCP_URL} token=$${PERA_AGENT_TOKEN%%_*}_…"
         exec /opt/hermes/docker/entrypoint-dispatch.sh gateway run
     environment:
       HERMES_UID: ${HERMES_UID:-10000}
       HERMES_GID: ${HERMES_GID:-10000}
       HERMES_MODEL: ${HERMES_MODEL:-moonshotai.kimi-k2.5}
+      HERMES_PROVIDER: ${HERMES_PROVIDER:-bedrock-openai}   # bedrock-openai (Bedrock API key) | bedrock (native Converse, IAM keys)
+      HERMES_BASE_URL: ${HERMES_BASE_URL:-}                   # override the OpenAI-compatible URL (default derives from AWS_REGION)
       # AWS Bedrock (the image ships boto3): either a Bedrock API key or IAM keys; region must have model access enabled.
       AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}

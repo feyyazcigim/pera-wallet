@@ -47,12 +47,15 @@ MCP URL, token), and the `payments/pera-wallet` skill is copied in.
    TELEGRAM_ALLOWED_USERS=<your telegram user id>
    PERA_AGENT_TOKEN=pat_…
    PERA_MCP_URL=https://api.<domain>/mcp
-   AWS_BEARER_TOKEN_BEDROCK=…          # Bedrock console → API keys (long-term); or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+   AWS_BEARER_TOKEN_BEDROCK=…          # Bedrock console → API keys (long-term)
    AWS_REGION=us-east-2                # a region where the model is available in-region
-   HERMES_MODEL=moonshotai.kimi-k2.5   # or any Converse-capable model id / inference profile (e.g. us.anthropic.claude-…)
+   HERMES_MODEL=moonshotai.kimi-k2.5   # any model id enabled under Model access
    ```
-   The model provider is AWS Bedrock (`model.provider: bedrock` in `config.yaml`; the Hermes image includes boto3).
-   IAM keys need `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`.
+   By default Hermes talks to Bedrock through its OpenAI-compatible endpoint
+   (`https://bedrock-runtime.<region>.amazonaws.com/openai/v1`, Bedrock API key as bearer) — Hermes' most mature
+   tool-calling path. `HERMES_PROVIDER=bedrock` switches to the native Converse route (IAM keys work there, needs
+   `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream`), which failed on Kimi K2.5 with
+   "toolResult blocks exceed toolUse blocks".
    No domain is needed (Telegram long-polling). Deploy, then message the bot: "what's my wallet balance?".
 4. Later changes: edit the env in Dokploy (model, token, MCP URL) or the YAML block in `docker-compose.yml`, then
    redeploy — the file in the volume is overwritten on boot. The on-chain cap and router rules bound every `pay_url`,
