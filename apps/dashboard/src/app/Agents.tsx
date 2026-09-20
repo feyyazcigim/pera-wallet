@@ -98,6 +98,26 @@ export function Agents() {
                   })}
                 </div>
               </div>
+              <div className="row field key-can">
+                <div>
+                  <span>This key</span>
+                  <small>follows the scopes you picked</small>
+                </div>
+                <ul>
+                  {SCOPES.map((sc) => (
+                    <li key={sc.id} className={scopes.includes(sc.id) ? "yes" : "off"}>
+                      <i>{scopes.includes(sc.id) ? "✓" : "·"}</i>
+                      {sc.id === "read" ? "sees balances, limits, quotes and history" : "pays x402 paywalls inside your rules"}
+                    </li>
+                  ))}
+                  <li className="no">
+                    <i>✕</i>never moves funds elsewhere
+                  </li>
+                  <li className="no">
+                    <i>✕</i>never adds money or changes your rules
+                  </li>
+                </ul>
+              </div>
               <div className="row save-row">
                 <ArrowFillButton as="button" type="submit" disabled={busy !== null || !name.trim() || scopes.length === 0} {...BTN}>
                   {busy === "create" ? "Creating…" : "Create key"}
@@ -106,44 +126,47 @@ export function Agents() {
             </div>
             {note && <p className="rule-note err">{note}</p>}
           </form>
-          {fresh && <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />}
-          <div className="keys-list">
-          <h2 className="section-title">Your keys</h2>
-          <dl className="accounts">
-            {keys === null && <div className="acct skeleton" />}
-            {keys?.length === 0 && <p className="muted">No keys yet.</p>}
-            {keys?.map((k) => (
-              <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
-                <dt>
-                  {k.name}
-                  <small>
-                    created {timeAgo(k.createdAt)}
-                    {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
-                    {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
-                    {k.revokedAt ? " · revoked" : ""}
-                  </small>
-                </dt>
-                <dd className="mono">
-                  {k.scopes.map((s) => (
-                    <span key={s} className="chip-scope">
-                      {s}
-                    </span>
-                  ))}
-                  {!k.revokedAt && (
-                    <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
-                      {busy === k.id ? "revoking…" : "revoke"}
-                    </button>
-                  )}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          </div>
         </div>
 
         <aside className="keys-right">
           <Connect kit={kit} token={token} />
         </aside>
+      </Rise>
+
+      <Rise className="dash-section">
+      {fresh && <CodeBlock label="key" file={fresh.key.name} note="Shown once. It is not stored; revoke it and make a new one if you lose it." secret text={fresh.secret} />}
+      <div className="keys-list">
+      <h2 className="section-title">Your keys</h2>
+      <dl className="accounts">
+        {keys === null && <div className="acct skeleton" />}
+        {keys?.length === 0 && <p className="muted">No keys yet.</p>}
+        {keys?.map((k) => (
+          <div key={k.id} className={`acct ${k.revokedAt ? "revoked" : ""}`}>
+            <dt>
+              {k.name}
+              <small>
+                created {timeAgo(k.createdAt)}
+                {k.lastUsedAt ? ` · last used ${timeAgo(k.lastUsedAt)}` : " · never used"}
+                {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString("en-GB")}` : ""}
+                {k.revokedAt ? " · revoked" : ""}
+              </small>
+            </dt>
+            <dd className="mono">
+              {k.scopes.map((s) => (
+                <span key={s} className="chip-scope">
+                  {s}
+                </span>
+              ))}
+              {!k.revokedAt && (
+                <button type="button" disabled={busy !== null} onClick={() => void revoke(k.id)}>
+                  {busy === k.id ? "revoking…" : "revoke"}
+                </button>
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      </div>
       </Rise>
 
     </>

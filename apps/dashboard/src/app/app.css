@@ -1644,17 +1644,68 @@ h2.section-title:not(.section-head *) {
   }
 }
 
-/* ── agents: the connect card is the form card's sibling: black strip, white body, soft footer.
-   Both start on the same line; the card keeps one height whichever client is picked, and the keys list
-   simply runs on under the form. Nothing is stretched to fill space. ── */
+/* ── agents: two sibling cards of exactly the same size: black strip, white body, soft footer.
+   The right one is sized for its longest tab; the left one fills the same height with what the key can do. ── */
 .keys-grid {
-  align-items: start;
+  align-items: stretch;
+}
+.keys-left,
+.keys-left .rules-editor,
+.keys-left .rulecard,
+.keys-right .connect {
+  height: 100%;
 }
 .keys-left {
-  gap: 28px;
+  gap: 0;
 }
 .keys-right {
   position: static;
+}
+.keys-left .rulecard,
+.connect {
+  display: flex;
+  flex-direction: column;
+}
+.connect-foot {
+  margin-top: auto !important;
+}
+.key-can {
+  flex: 1;
+  align-items: flex-start !important;
+}
+.key-can ul {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.key-can li {
+  display: flex;
+  gap: 10px;
+}
+.key-can li i {
+  flex: none;
+  align-self: flex-start;
+  width: 1.35em;
+  height: 1.35em;
+  line-height: 1.35em;
+  font-style: normal;
+  text-align: center;
+}
+.key-can li.yes i {
+  border-radius: 4px;
+  background: var(--yellow);
+  color: var(--ink);
+}
+.key-can li.off {
+  color: #b4b4b4;
+}
+.key-can li.no {
+  color: var(--muted);
 }
 .connect-tabs {
   padding: 14px 22px 0;
