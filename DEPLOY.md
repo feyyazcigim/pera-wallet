@@ -68,11 +68,23 @@ output with nginx (SPA fallback in `apps/dashboard/nginx.conf`, needed for `/app
 Order: 1 → 2 → 3. Builds are memory-hungry: deploy one Application at a time. 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time. 1 → 2 → 3. Nixpacks builds are memory-hungry: deploy one Application at a time.
 
 ## 4 · Optional: demo paywalls (`pera-resource-server`, port 4000)
-Nixpacks, Build Path `/`, env `NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml`, `PORT=4000`, `SPONSOR_SECRET`,
-`PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `X402_FACILITATOR_URL`, optional `MERCHANT_STELLAR_ADDRESS`; domain `x402.<domain>`
-→ port 4000. Then set `RESOURCE_SERVER_URL=https://x402.<domain>` on the API and `VITE_RESOURCE_SERVER_URL` on the
-dashboard and redeploy both. Without it, `list_services` / `/agent/services` return an empty list and the dashboard's
-demo buttons have no targets; `quote_payment` / `pay_url` work with any x402 URL.
+Three x402 endpoints (`/api/stellar/weather` — Stellar only, `/api/base/summary` — Base only, `/api/any/quote` — both)
+at $0.01 each, so agents have something to pay on testnet. Application → GitHub `pera-wallet`, **Nixpacks**, Build
+Path `/`, domain `x402.<domain>` → port 4000, HTTPS. Env:
+```
+NIXPACKS_CONFIG_FILE=nixpacks.resource-server.toml
+PORT=4000
+SPONSOR_SECRET=S…                     # same as the API (only used as the default merchant)
+X402_FACILITATOR_URL=https://x402.org/facilitator
+MERCHANT_STELLAR_ADDRESS=G…           # receives the USDC: any testnet account with a USDC trustline,
+                                      # e.g. your Treasury from the dashboard (Rules → Your accounts)
+PASSKEY_RP_ID=<domain>                # loadEnv() needs them; unused here
+PASSKEY_ORIGINS=https://<domain>
+PRIVY_APP_ID= / PRIVY_APP_SECRET=     # optional: enables the Base offers (merchant = app-owned Privy wallet)
+```
+Then set `RESOURCE_SERVER_URL=https://x402.<domain>` on the API and `VITE_RESOURCE_SERVER_URL=https://x402.<domain>` on
+the dashboard and redeploy both: `list_services` / `/agent/services` list the endpoints and the dashboard's demo
+buttons get targets. `quote_payment` / `pay_url` work with any x402 URL regardless.
 
 ## Verify
 ```bash

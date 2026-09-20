@@ -10,13 +10,22 @@ import { HTTPFacilitatorClient, type RouteConfig } from "@x402/core/server";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { ensureAppWallet, isPrivyConfigured } from "@pera/evm";
-import { BASE_SEPOLIA_CAIP2, childLogger, derivedKeys, loadEnv, STELLAR_CAIP2, X402 } from "@pera/core";
+import { BASE_SEPOLIA_CAIP2, childLogger, derivedKeys, HORIZON_URL, loadEnv, sponsorPublicKey, STELLAR_CAIP2, USDC_CODE, USDC_ISSUER, X402 } from "@pera/core";
 import { fetchIstanbulWeather } from "./weather";
 
 const env = loadEnv();
 const log = childLogger("resource-server");
 
-const payToStellar = env.MERCHANT_STELLAR_ADDRESS ?? derivedKeys(env).ownerPub;
+// Merchant on Stellar: an explicit address (any testnet account WITH a USDC trustline — e.g. your own treasury from the
+// dashboard), else the legacy single-user owner, else the sponsor. Settlement fails without the trustline, so warn early.
+const payToStellar = env.MERCHANT_STELLAR_ADDRESS ?? (env.OWNER_SECRET && env.AGENT_SECRET ? derivedKeys(env).ownerPub : sponsorPublicKey(env));
+try {
+  const acct = (await (await fetch(`${HORIZON_URL}/accounts/${payToStellar}`)).json()) as { balances?: { asset_code?: string; asset_issuer?: string }[] };
+  if (!acct.balances?.some((b) => b.asset_code === USDC_CODE && b.asset_issuer === USDC_ISSUER))
+    log.error({ payToStellar }, "merchant Stellar account has no USDC trustline — Stellar payments will fail to settle; set MERCHANT_STELLAR_ADDRESS to an account that holds testnet USDC");
+} catch (err) {
+  log.warn({ err, payToStellar }, "could not check the merchant's USDC trustline");
+}
 // Merchant on Base Sepolia: an explicit address, or an app-owned Privy wallet created on first start.
 const payToEvm = env.MERCHANT_EVM_ADDRESS ?? (isPrivyConfigured() ? (await ensureAppWallet("merchant")).address : undefined);
 
