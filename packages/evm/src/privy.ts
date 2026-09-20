@@ -103,6 +103,10 @@ export async function signTypedDataFor(wallet: EvmWalletRef, typedData: TypedDat
   const privy = getPrivy();
   const delegated = await hasCode(wallet.address);
   const res = await privy.wallets().ethereum().signTypedData(wallet.walletId, {
+    // caip2 is optional in the SDK types but Privy requires it for the ERC-1271 wrapping of a 7702-delegated wallet
+    // ("caip-2 required"); always send it — the wallet only ever signs for Base Sepolia.
+    caip2: BASE_SEPOLIA_CAIP2,
+    chain_type: "ethereum",
     params: {
       typed_data: {
         domain: jsonSafe(typedData.domain) as never,
