@@ -59,7 +59,8 @@ function b64uToBytes(s: string): Uint8Array {
  */
 export async function signWithPasskey(wallet: { contractId: string; credentialId: string; publicKeyB64u: string | null }, json: string, method: "execute" | "add_policy" | "add_context_rule" = "execute"): Promise<string> {
   const k = await attach(wallet);
-  const tx = method === "add_policy" ? k.wallet!.fromJSON.add_policy(json) : method === "add_context_rule" ? k.wallet!.fromJSON.add_context_rule(json) : k.wallet!.fromJSON.execute(json);
+  const built = method === "add_policy" ? k.wallet!.fromJSON.add_policy(json) : method === "add_context_rule" ? k.wallet!.fromJSON.add_context_rule(json) : k.wallet!.fromJSON.execute(json);
+  const tx = built as unknown as Parameters<SmartAccountKit["signAdmin"]>[0]; // signAdmin only cares about the auth entries, not the return type
   const signed = await k.signAdmin(tx, { resolveContextRuleIds: () => [0] }); // rule 0 = the passkey
   return signed.toXDR();
 }
