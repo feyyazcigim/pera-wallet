@@ -1,6 +1,6 @@
 import { FeeBumpTransaction, TransactionBuilder } from "@stellar/stellar-sdk";
 import type { PaymentPayload, PaymentRequired } from "@x402/core/types";
-import { baseTxUrl, BASE_SEPOLIA_CAIP2, childLogger, cmpUsdc, events, maxUsdc, NETWORK_PASSPHRASE, STELLAR_CAIP2, stellarTxUrl, subUsdc, type Caip2Network } from "@pera/core";
+import { baseTxUrl, BASE_SEPOLIA_CAIP2, childLogger, cmpUsdc, events, maxUsdc, NETWORK_PASSPHRASE, STELLAR_CAIP2, stellarTxUrl, subUsdc, type Caip2Network, loadEnv } from "@pera/core";
 import { bridgeToBase } from "@pera/cctp";
 import { getBaseUsdcBalance, type EvmWalletRef } from "@pera/evm";
 import { httpClientFor } from "./client";
@@ -156,7 +156,7 @@ export async function payFor(
     const wallet = ctx.evmWallet!;
     const have = await getBaseUsdcBalance(wallet.address);
     if (cmpUsdc(have, offer.amountUsdc) < 0) {
-      const bridgeAmt = maxUsdc(subUsdc(offer.amountUsdc, have), o.bridgeMinUsdc ?? "1");
+      const bridgeAmt = maxUsdc(subUsdc(offer.amountUsdc, have), o.bridgeMinUsdc ?? loadEnv().BASE_BRIDGE_MIN_USDC);
       result.float = await ensureFloat(ctx, { neededUsdc: bridgeAmt });
       const b = await bridgeToBase({ userId: ctx.userId, agentSecret: ctx.agentSecret, agentPub: ctx.agentPub, evmWallet: wallet }, { amountUsdc: bridgeAmt });
       result.bridged = { burnTxHash: b.burnTxHash, mintTxHash: b.mintTxHash, amountUsdc: b.amountUsdc };

@@ -31,6 +31,8 @@ export const EnvSchema = z.object({
   AGENT_DAILY_CAP_USDC: DecimalUsdc.default("10"),
   AGENT_WEEKLY_CAP_USDC: DecimalUsdc.default("50"),
   YIELD_RESERVE_USDC: DecimalUsdc.default("5"),
+  /** Smallest CCTP bridge when a Base payment finds the Base wallet short: a float, so the next Base payments skip the 1–3 min bridge. */
+  BASE_BRIDGE_MIN_USDC: DecimalUsdc.default("1"),
   BOOTSTRAP_ONRAMP_TRY: z.string().regex(/^\d+(\.\d{1,2})?$/).default("3000"),
   AUTOPILOT: z.enum(["on", "off"]).default("on"),
 

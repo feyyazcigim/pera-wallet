@@ -91,16 +91,24 @@ export async function findPrivyWalletByAddress(address: string): Promise<EvmWall
 }
 
 /** EIP-712 signature (ECDSA, or ERC-1271 mode once the wallet is 7702-delegated by gas sponsorship). */
+/** Privy's REST body is JSON: EIP-712 uint values arrive from @x402/evm as bigint (value, validAfter, validBefore, chainId) and must go out as decimal strings. */
+function jsonSafe<T>(v: T): T {
+  if (typeof v === "bigint") return v.toString() as unknown as T;
+  if (Array.isArray(v)) return v.map(jsonSafe) as unknown as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, jsonSafe(x)])) as T;
+  return v;
+}
+
 export async function signTypedDataFor(wallet: EvmWalletRef, typedData: TypedDataInput): Promise<Hex> {
   const privy = getPrivy();
   const delegated = await hasCode(wallet.address);
   const res = await privy.wallets().ethereum().signTypedData(wallet.walletId, {
     params: {
       typed_data: {
-        domain: typedData.domain as never,
+        domain: jsonSafe(typedData.domain) as never,
         types: typedData.types as never,
         primary_type: typedData.primaryType,
-        message: typedData.message as never,
+        message: jsonSafe(typedData.message) as never,
       },
     },
     ...(delegated ? { signature_options: { type: "erc1271" as const } } : {}),
