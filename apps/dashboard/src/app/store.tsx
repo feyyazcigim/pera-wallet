@@ -102,6 +102,7 @@ export function describe(e: PeraEvent): { kind: EventKind; label: string; sign: 
     case "onramp.completed": return { kind: "deposit", label: "Lira arrived as USDC", sign: "+" };
     case "yield.deposited": return { kind: "yield", label: "Moved into the vault", sign: "" };
     case "yield.withdrawn": return { kind: "yield", label: "Pulled from the vault", sign: "" };
+    case "treasury.swept": return { kind: "yield", label: "Idle USDC moved from the smart account", sign: "" };
     case "float.topup": return { kind: "agent", label: "Agent budget topped up", sign: "" };
     case "float.topup.rejected": return { kind: "agent", label: "Top-up rejected by the on-chain cap", sign: "", rejected: true };
     case "x402.402": return { kind: "agent", label: `Paywall quoted a price${where}`, sign: "" };

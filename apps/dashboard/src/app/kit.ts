@@ -57,9 +57,9 @@ function b64uToBytes(s: string): Uint8Array {
  * Sign a kit-serialised smart-account transaction with the owner's passkey (one Face ID prompt) → XDR.
  * `execute` carries a policy's set_spending_limit; `add_policy` attaches the weekly window to an older rule.
  */
-export async function signWithPasskey(wallet: { contractId: string; credentialId: string; publicKeyB64u: string | null }, json: string, method: "execute" | "add_policy" = "execute"): Promise<string> {
+export async function signWithPasskey(wallet: { contractId: string; credentialId: string; publicKeyB64u: string | null }, json: string, method: "execute" | "add_policy" | "add_context_rule" = "execute"): Promise<string> {
   const k = await attach(wallet);
-  const tx = method === "add_policy" ? k.wallet!.fromJSON.add_policy(json) : k.wallet!.fromJSON.execute(json);
+  const tx = method === "add_policy" ? k.wallet!.fromJSON.add_policy(json) : method === "add_context_rule" ? k.wallet!.fromJSON.add_context_rule(json) : k.wallet!.fromJSON.execute(json);
   const signed = await k.signAdmin(tx, { resolveContextRuleIds: () => [0] }); // rule 0 = the passkey
   return signed.toXDR();
 }

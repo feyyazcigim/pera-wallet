@@ -861,6 +861,39 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /agent/sweep/build:
+    post:
+      summary: Build add_context_rule for the treasury-sweep rule (server sweeper key,
+        USDC SAC only, no policy) for passkey signing — accounts created before
+        auto-sweep existed
+      security: *a2
+      responses:
+        "200":
+          description: "{ json, xdr, ruleName, sweeperPublicKey, smartAccountId }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /agent/sweep:
+    post:
+      summary: Submit the passkey-signed treasury-sweep rule; idle smart-account USDC
+        then flows to the treasury and vault automatically
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XdrBody"
+      responses:
+        "200":
+          description: "{ ruleId, txHash, explorerUrl }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /agent/authorize:
     post:
       summary: Submit the passkey-signed rule transaction sponsored; records the rule id

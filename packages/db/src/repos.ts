@@ -103,6 +103,7 @@ export interface StellarWallet {
   agentPublicKey: string;
   agentSecret: string;
   agentRuleId: number | null;
+  sweepRuleId: number | null;
   dailyCapUsdc: string;
   status: StellarWalletStatus;
   statusDetail: string | null;
@@ -118,6 +119,7 @@ const rowToStellar = (r: Record<string, unknown>): StellarWallet => ({
   agentPublicKey: String(r.agent_public_key),
   agentSecret: decryptSecret(String(r.agent_secret_enc)),
   agentRuleId: r.agent_rule_id === null || r.agent_rule_id === undefined ? null : Number(r.agent_rule_id),
+  sweepRuleId: r.sweep_rule_id === null || r.sweep_rule_id === undefined ? null : Number(r.sweep_rule_id),
   dailyCapUsdc: String(r.daily_cap_usdc),
   status: String(r.status) as StellarWalletStatus,
   statusDetail: (r.status_detail as string | null) ?? null,
@@ -155,7 +157,7 @@ export async function getStellarWalletBySmartAccount(smartAccountId: string): Pr
   return rows[0] ? rowToStellar(rows[0]) : null;
 }
 
-export async function updateStellarWallet(userId: string, patch: Partial<Pick<StellarWallet, "agentRuleId" | "dailyCapUsdc" | "status" | "statusDetail" | "deployTxHash">>): Promise<void> {
+export async function updateStellarWallet(userId: string, patch: Partial<Pick<StellarWallet, "agentRuleId" | "sweepRuleId" | "dailyCapUsdc" | "status" | "statusDetail" | "deployTxHash">>): Promise<void> {
   const db = await getDb();
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -164,6 +166,7 @@ export async function updateStellarWallet(userId: string, patch: Partial<Pick<St
     sets.push(`${col} = $${params.length}`);
   };
   if (patch.agentRuleId !== undefined) push("agent_rule_id", patch.agentRuleId);
+  if (patch.sweepRuleId !== undefined) push("sweep_rule_id", patch.sweepRuleId);
   if (patch.dailyCapUsdc !== undefined) push("daily_cap_usdc", patch.dailyCapUsdc);
   if (patch.status !== undefined) push("status", patch.status);
   if (patch.statusDetail !== undefined) push("status_detail", patch.statusDetail);

@@ -16,6 +16,7 @@ export type EventType =
   | "yield.withdrawn"
   | "float.topup"
   | "float.topup.rejected"
+  | "treasury.swept"
   | "x402.402"
   | "x402.paid"
   | "x402.rejected"

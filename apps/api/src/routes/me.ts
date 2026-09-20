@@ -25,6 +25,8 @@ export async function meView(user: User) {
             agentUrl: stellarAccountUrl(w.agentPublicKey),
             agentRuleId: w.agentRuleId,
             agentAuthorised: w.agentRuleId !== null,
+            sweepRuleId: w.sweepRuleId,
+            autoSweep: w.sweepRuleId !== null,
             dailyCapUsdc: w.dailyCapUsdc,
             status: w.status,
             statusDetail: w.statusDetail,

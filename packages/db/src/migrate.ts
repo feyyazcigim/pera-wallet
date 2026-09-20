@@ -89,6 +89,8 @@ const STATEMENTS = [
      updated_at timestamptz not null default now()
    )`,
   `alter table agent_rules add column if not exists approve_above_usdc text`,
+  // policy-free "treasury-sweep" rule: a server key moves idle smart-account USDC to the treasury (null = not enabled)
+  `alter table stellar_wallets add column if not exists sweep_rule_id integer`,
   `create table if not exists agent_tokens (
      id text primary key,
      user_id text not null references users(id),

@@ -23,6 +23,7 @@ type WireMe = {
       smartAccountId: string; smartAccountUrl: string; credentialId: string; passkeyPublicKey: string | null;
       treasury: string; treasuryUrl: string; agent: string; agentUrl: string;
       agentRuleId: number | null; agentAuthorised: boolean; dailyCapUsdc: string; status: string; statusDetail: string | null;
+      sweepRuleId?: number | null; autoSweep?: boolean;
     } | null;
     evm: { provider: string; address: string; explorerUrl: string; network: string } | null;
   };
@@ -52,6 +53,8 @@ export type Me = {
   agentPublicKey: string | null; agentUrl: string | null;
   evmAddress: string | null; evmUrl: string | null;
   credentialId: string | null; passkeyPublicKey: string | null;
+  /** the treasury-sweep rule is on the smart account: USDC sent to it moves to the treasury/vault by itself */
+  autoSweep: boolean;
 };
 export type Balances = { treasury: number; float: number; smartAccount: number; vault: number; base: number; total: number };
 export type Position = { valueUsdc: number; apy: number | null; vaultId: string | null; explorerUrl: string | null };
@@ -106,6 +109,8 @@ export interface Backend {
   /** Daily cap (on-chain). Pass `rules` to change the router rules under the same single passkey prompt. */
   /** A contract change, signed by the passkey. `window` picks the policy: the daily one or the weekly one. */
   setCap(capUsdc: number, me: Me, rules?: RulesInput, window?: "daily" | "weekly"): Promise<void>;
+  /** One passkey prompt: adds the treasury-sweep rule to an account created before auto-sweep existed. */
+  enableAutoSweep(me: Me): Promise<void>;
   /** The IBAN + reference that route a bank transfer to this user (a fresh reference once the last one is used). */
   depositDetails(): Promise<DepositDetails>;
   /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
@@ -240,6 +245,7 @@ function normMe(m: WireMe): Me {
     agentPublicKey: s?.agent ?? null, agentUrl: s?.agentUrl ?? null,
     evmAddress: e?.address ?? null, evmUrl: e?.explorerUrl ?? null,
     credentialId: s?.credentialId ?? null, passkeyPublicKey: s?.passkeyPublicKey ?? null,
+    autoSweep: s?.autoSweep ?? false,
   };
 }
 const normRules = (r: WireRules): Rules => ({
@@ -254,7 +260,7 @@ const wireRules = (input: RulesInput) => ({
   maxPerCallUsdc: input.maxPerCallUsdc === null ? null : dec(input.maxPerCallUsdc, 7),
   allowedNetworks: input.allowedNetworks,
 });
-const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "x402.402", "x402.paid", "x402.rejected", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
+const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "treasury.swept", "x402.402", "x402.paid", "x402.rejected", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
 const timelineLabel = (e: WireEvent) => `${e.type}${e.amountUsdc ? ` · ${e.amountUsdc} USDC` : ""}${e.network?.startsWith("eip155") ? " · Base" : ""}`;
 
 let yieldRetryAt = 0;
@@ -368,6 +374,13 @@ const httpBackend: Backend = {
     const { signWithPasskey } = await import("./kit"); // heavy (stellar-sdk + kit): only loaded here
     const xdr = await signWithPasskey({ contractId: me.smartAccountId, credentialId: me.credentialId, publicKeyB64u: me.passkeyPublicKey }, build.json, build.method === "add_policy" ? "add_policy" : "execute");
     await http("/agent/policy", { body: { xdr, ...cap, rules: rules ? wireRules(rules) : undefined } });
+  },
+  async enableAutoSweep(me) {
+    if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up — try again in a moment.");
+    const build = await http<{ json: string }>("/agent/sweep/build", { body: {} });
+    const { signWithPasskey } = await import("./kit");
+    const xdr = await signWithPasskey({ contractId: me.smartAccountId, credentialId: me.credentialId, publicKeyB64u: me.passkeyPublicKey }, build.json, "add_context_rule");
+    await http("/agent/sweep", { body: { xdr } });
   },
 };
 

@@ -136,6 +136,7 @@ export const demoBackend: Backend = {
       id: "demo", displayName: state.name, email: null, status: "ready", statusDetail: null,
       smartAccountId: "CDEMO…SMARTACCOUNT", smartAccountUrl: null, treasuryPublicKey: "GDEMO…TREASURY", treasuryUrl: null,
       agentPublicKey: "GDEMO…AGENT", agentUrl: null, evmAddress: "0xDe00…dEm0", evmUrl: null, credentialId: null, passkeyPublicKey: null,
+      autoSweep: true,
     };
   },
   async balances() {
@@ -239,6 +240,9 @@ export const demoBackend: Backend = {
   async revokeAgentKey(id) {
     const k = demoKeys.find((x) => x.id === id);
     if (k) k.revokedAt = new Date().toISOString();
+  },
+  async enableAutoSweep() {
+    await wait(1200);
   },
   async setCap(capUsdc, _me, rules, window = "daily") {
     await wait(1400); // stands in for the passkey prompt + sponsored submit

@@ -3,12 +3,14 @@ import type { z } from "zod";
 import { events, loadEnv, maxUsdc, SMART_ACCOUNT, stellarTxUrl } from "@pera/core";
 import { consumeChallenge, createAgentToken, createChallenge, getAgentRules, getPasskey, touchPasskey, updateStellarWallet, upsertAgentRules } from "@pera/db";
 import { verifyAssertion } from "@pera/passkey";
-import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, buildSetWeeklyCapTx, getPolicyUsage, getRule, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME } from "@pera/smart-account";
+import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, buildSetWeeklyCapTx, buildSweepRuleTx, findSweepRuleId, getPolicyUsage, getRule, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME, SWEEP_RULE_NAME } from "@pera/smart-account";
 import { transferUsdcFrom } from "@pera/evm";
 import { ensureSmartAccountBalance } from "@pera/x402-router";
 import { addUsdc } from "@pera/core";
 import { requireOwner, requireScope } from "../auth";
+import { sweepUser } from "../autopilot";
 import { loadContext } from "../context";
+import { deriveSweeper } from "../provisioning";
 import { hermesConnectKit } from "../mcp/hermes";
 import { executePayment, listServices, quotePayment, rulesView } from "../services/payments";
 import { AuthorizeBuildBody, CapBody, DecimalUsdc, EvmTransferBody, PayBody, PayBodyV2, QuoteBody, RulesApprovalBody, RulesBody, XdrBody } from "../schemas";
@@ -61,6 +63,27 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     await updateStellarWallet(ctx.userId, { agentRuleId: ruleId, status: "ready", statusDetail: null });
     events.emit({ type: "agent.authorized", userId: ctx.userId, network: "stellar:testnet", txHash: r.hash, explorerUrl: stellarTxUrl(r.hash), detail: { ruleId, dailyCapUsdc: ctx.dailyCapUsdc, agentPublicKey: ctx.agentPub } });
     return { ruleId, txHash: r.hash, explorerUrl: r.explorerUrl, dailyCapUsdc: ctx.dailyCapUsdc };
+  });
+
+  /**
+   * Auto-sweep for accounts created before the treasury-sweep rule existed (new sign-ups get it at creation):
+   * build the add_context_rule (server sweeper key, USDC SAC only, no policy) → passkey signs → POST /agent/sweep.
+   */
+  app.post("/agent/sweep/build", async (req) => {
+    const ctx = await loadContext(requireOwner(req).id);
+    const sweeper = deriveSweeper(ctx.credentialId, loadEnv().WALLET_MASTER_KEY);
+    const { tx } = await buildSweepRuleTx(ctx, sweeper.publicKey);
+    return { json: tx.toJSON(), xdr: tx.toXDR(), ruleName: SWEEP_RULE_NAME, sweeperPublicKey: sweeper.publicKey, smartAccountId: ctx.smartAccountId };
+  });
+  app.post("/agent/sweep", async (req) => {
+    const ctx = await loadContext(requireOwner(req).id);
+    const { xdr } = XdrBody.parse(req.body);
+    const r = await submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
+    const ruleId = await findSweepRuleId(ctx);
+    if (ruleId === null) throw Object.assign(new Error("treasury-sweep rule not found after submit"), { statusCode: 500, code: "SWEEP_RULE_MISSING" });
+    await updateStellarWallet(ctx.userId, { sweepRuleId: ruleId });
+    void sweepUser(ctx.userId, { force: true }).catch(() => undefined);
+    return { ruleId, txHash: r.hash, explorerUrl: r.explorerUrl };
   });
 
   /** Cap change, same two-step passkey flow. */

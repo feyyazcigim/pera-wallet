@@ -2,7 +2,7 @@ import { getEvmWallet, getStellarWallet, type StellarWallet } from "@pera/db";
 import type { UserWalletContext } from "@pera/core";
 import type { EvmWalletRef } from "@pera/evm";
 
-export type ApiUserContext = UserWalletContext & { evmWallet?: EvmWalletRef; status: StellarWallet["status"] };
+export type ApiUserContext = UserWalletContext & { evmWallet?: EvmWalletRef; status: StellarWallet["status"]; sweepRuleId: number | null };
 
 export function toContext(w: StellarWallet, evm: EvmWalletRef | undefined): ApiUserContext {
   return {
@@ -18,6 +18,7 @@ export function toContext(w: StellarWallet, evm: EvmWalletRef | undefined): ApiU
     evm: evm ? { provider: evm.provider, walletId: evm.walletId, address: evm.address } : undefined,
     evmWallet: evm,
     status: w.status,
+    sweepRuleId: w.sweepRuleId,
   };
 }
 
