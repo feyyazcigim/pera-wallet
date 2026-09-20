@@ -17,8 +17,8 @@ const STEPS: { n: string; title: string; body: string; tag: string; Visual: () =
     body: "USDC is deposited into a yield vault automatically. Your balance never sits idle." },
   { n: "04", title: "Your agent pays its own way", tag: "x402 · Soroban", Visual: PaymentsVisual,
     body: "The agent settles API calls over x402, per request, inside the limits you set on-chain." },
-  { n: "05", title: "One vault, any chain out", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
-    body: "Lira comes in once and becomes USDC on Stellar. When a paywall lives on another chain, Circle CCTP burns that USDC on Stellar and mints it natively there. No bridges, no wrapped tokens, the same rules." },
+  { n: "05", title: "One vault, Stellar or Base", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
+    body: "Lira comes in once and becomes USDC on Stellar. Paywalls on Stellar are paid natively. When one lives on Base, Circle CCTP burns that USDC on Stellar and mints it there. No bridges, no wrapped tokens, the same rules." },
 ];
 
 const DWELL = 6.5; // seconds per step before it moves on by itself
@@ -283,17 +283,14 @@ function PaymentsVisual() {
   );
 }
 
-/* 05: lira comes in once and becomes USDC on Stellar; from there CCTP carries it out to whichever chain the paywall lives on */
+/* 05: lira comes in once and becomes USDC on Stellar; the agent pays Stellar paywalls natively and Base paywalls through CCTP */
 const INBOUND = { via: "Stellar anchor · SEP-6", steps: ["transfer", "quote", "payout"] };
 // `live` is honest on purpose: flip a destination to true once it works end to end.
 const DESTS = [
-  { name: "Base", via: "Circle CCTP · domain 6", live: false },
-  { name: "Ethereum", via: "Circle CCTP · domain 0", live: false },
-  { name: "Arbitrum", via: "Circle CCTP · domain 3", live: false },
-  { name: "Solana", via: "Circle CCTP · domain 5", live: false },
+  { name: "Stellar", via: "x402 · native", steps: ["sign", "settle", "paid"], live: true },
+  { name: "Base", via: "Circle CCTP · domain 6", steps: ["burn", "attest", "mint"], live: false },
 ];
-const OUT_STEPS = ["burn", "attest", "mint"];
-const CH = { bankX: 24, bankW: 144, hubX: 238, hubW: 164, outX: 488, outW: 128, ty: 108, row: (i: number) => 36 + i * 48 };
+const CH = { bankX: 24, bankW: 144, hubX: 238, hubW: 164, outX: 488, outW: 128, ty: 108, row: (i: number) => 74 + i * 68 };
 type Seg = { x0: number; y0: number; x1: number; y1: number };
 const IN_SEG: Seg = { x0: CH.bankX + CH.bankW, y0: CH.ty, x1: CH.hubX, y1: CH.ty };
 const outSeg = (i: number): Seg => ({ x0: CH.hubX + CH.hubW, y0: CH.ty, x1: CH.outX, y1: CH.row(i) });
@@ -320,7 +317,7 @@ function ChainsVisual() {
   const sel = round % DESTS.length;
   const outbound = tick % 8 >= 4;
   const step = tick % 4;
-  const leg = outbound ? { via: DESTS[sel].via, steps: OUT_STEPS, live: DESTS[sel].live } : { ...INBOUND, live: true };
+  const leg = outbound ? DESTS[sel] : { ...INBOUND, live: true };
   const k = segKeyframes(outbound ? outSeg(sel) : IN_SEG);
   return (
     <div className="v-chains" ref={ref}>
@@ -391,7 +388,7 @@ function ChainsVisual() {
             const active = step === i;
             const done = step > i;
             return (
-              <g key={`${outbound}-${label}`} transform={`translate(${(i - 1) * 64 - 29},6)`}>
+              <g key={`${outbound ? sel : "in"}-${label}`} transform={`translate(${(i - 1) * 64 - 29},6)`}>
                 <motion.rect width={58} height={22} rx={11} stroke={active || done ? "#0a0a0a" : "#dcdcdc"} strokeWidth={1} initial={false} animate={{ fill: active ? "#ffd400" : "#ffffff" }} transition={{ duration: 0.25 }} />
                 <text x={29} y={14.5} textAnchor="middle" fill={active || done ? "#0a0a0a" : "#a5a5a5"}>
                   {label}
