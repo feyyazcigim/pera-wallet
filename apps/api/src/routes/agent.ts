@@ -1,13 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { events, stellarTxUrl } from "@pera/core";
-import { getAgentRules, listPaidAmountsSince, updateStellarWallet, upsertAgentRules } from "@pera/db";
+import { consumeChallenge, createChallenge, getAgentRules, getPasskey, listPaidAmountsSince, touchPasskey, updateStellarWallet, upsertAgentRules } from "@pera/db";
+import { verifyAssertion } from "@pera/passkey";
 import { attemptOverCap, buildAgentRuleTx, buildSetCapTx, getPolicyUsage, resolveNewRuleId, submitPasskeySignedXdr, AGENT_RULE_NAME } from "@pera/smart-account";
 import { transferUsdcFrom } from "@pera/evm";
 import { ensureSmartAccountBalance, payFor, RuleViolationError } from "@pera/x402-router";
-import { addUsdc, cmpUsdc } from "@pera/core";
+import { addUsdc, cmpUsdc, loadEnv } from "@pera/core";
 import { requireUser } from "../auth";
 import { loadContext } from "../context";
-import { AuthorizeBuildBody, EvmTransferBody, PayBody, PolicyBody, RulesBody, XdrBody } from "../schemas";
+import { AuthorizeBuildBody, EvmTransferBody, PayBody, PolicyBody, RulesApprovalBody, RulesBody, XdrBody } from "../schemas";
 
 /** Collects the events emitted for this user during `fn` (returned as `timeline`). */
 async function withTimeline<T>(userId: string, fn: () => Promise<T>): Promise<T & { timeline: unknown[] }> {
@@ -65,10 +66,12 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
   });
   app.post("/agent/policy", async (req) => {
     const ctx = await loadContext(requireUser(req).id);
-    const { xdr, dailyCapUsdc } = XdrBody.extend({ dailyCapUsdc: PolicyBody.shape.dailyCapUsdc }).parse(req.body);
+    const { xdr, dailyCapUsdc, rules } = XdrBody.extend({ dailyCapUsdc: PolicyBody.shape.dailyCapUsdc, rules: RulesBody.optional() }).parse(req.body);
     const r = await submitPasskeySignedXdr({ xdr, expectContract: ctx.smartAccountId });
     await updateStellarWallet(ctx.userId, { dailyCapUsdc });
-    return { ruleId: ctx.agentRuleId, txHash: r.hash, explorerUrl: r.explorerUrl, dailyCapUsdc };
+    // the transaction above only lands if the owner's passkey signed it, so it also approves the router rules sent with it
+    if (rules) await upsertAgentRules(ctx.userId, rules);
+    return { ruleId: ctx.agentRuleId, txHash: r.hash, explorerUrl: r.explorerUrl, dailyCapUsdc, rules: rules ? await getAgentRules(ctx.userId) : undefined };
   });
 
   /** Generic sponsored submission of any passkey-signed transaction targeting the user's smart account. */
@@ -88,10 +91,39 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     return { ...rules, spentThisWeekUsdc: paid.reduce((a, x) => addUsdc(a, x), "0"), paymentsThisWeek: paid.length, enforcedBy: "router" as const };
   };
   app.get("/agent/rules", async (req) => rulesView(requireUser(req).id));
-  app.put("/agent/rules", async (req) => {
-    const user = requireUser(req);
-    await upsertAgentRules(user.id, RulesBody.parse(req.body));
-    return rulesView(user.id);
+  /**
+   * Changing the rules is the owner's call, not the server's or the agent's: the new ruleset is bound to a
+   * single-use challenge and only applied when the passkey that owns the smart account signs that challenge.
+   */
+  app.post("/agent/rules/options", async (req) => {
+    const env = loadEnv();
+    const ctx = await loadContext(requireUser(req).id);
+    const rules = RulesBody.parse(req.body);
+    const challenge = await createChallenge({ purpose: "rules", credentialId: ctx.credentialId, payload: JSON.stringify(rules) });
+    return { challenge, rpId: env.PASSKEY_RP_ID, userVerification: "required", allowCredentials: [{ id: ctx.credentialId, type: "public-key" }], timeout: 60_000, rules };
+  });
+  app.put("/agent/rules", async (req, reply) => {
+    const env = loadEnv();
+    const ctx = await loadContext(requireUser(req).id);
+    const { challenge, assertion } = RulesApprovalBody.parse(req.body);
+    const ch = await consumeChallenge(challenge, "rules");
+    if (!ch?.payload) return reply.status(401).send({ error: "approval expired or unknown, start again", code: "BAD_CHALLENGE" });
+    if (ch.credentialId !== ctx.credentialId || assertion.id !== ctx.credentialId) return reply.status(403).send({ error: "only the passkey that owns this wallet can change its rules", code: "NOT_OWNER" });
+    const passkey = await getPasskey(ctx.credentialId);
+    if (!passkey) return reply.status(401).send({ error: "unknown passkey", code: "UNKNOWN_CREDENTIAL" });
+    await verifyAssertion({
+      assertion,
+      publicKey: passkey.publicKey,
+      expectedChallenge: challenge,
+      expectedOrigins: env.PASSKEY_ORIGINS.split(",").map((x) => x.trim()).filter(Boolean),
+      expectedRpId: env.PASSKEY_RP_ID,
+      requireUserVerification: false,
+    }).catch((err: Error) => {
+      throw Object.assign(new Error(`passkey verification failed: ${err.message}`), { statusCode: 401, code: "BAD_ASSERTION" });
+    });
+    await touchPasskey(passkey.credentialId);
+    await upsertAgentRules(ctx.userId, RulesBody.parse(JSON.parse(ch.payload)));
+    return rulesView(ctx.userId);
   });
 
   app.post("/agent/pay", async (req) => {

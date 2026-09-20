@@ -18,7 +18,7 @@ const STEPS: { n: string; title: string; body: string; tag: string; Visual: () =
   { n: "04", title: "Your agent pays its own way", tag: "x402 · Soroban", Visual: PaymentsVisual,
     body: "The agent settles API calls over x402, per request, inside the limits you set on-chain." },
   { n: "05", title: "Any chain in, one vault", tag: "Circle CCTP · Stellar domain 27", Visual: ChainsVisual,
-    body: "Not only lira. USDC from other chains is burned there and minted natively on Stellar — it lands as the same USDC, in the same vault, under the same rules." },
+    body: "Not only lira. USDC from other chains is burned there and minted natively on Stellar. It lands as the same USDC, in the same vault, under the same rules." },
 ];
 
 const DWELL = 6.5; // seconds per step before it moves on by itself

@@ -101,7 +101,7 @@ function topUpFloat(amount: number) {
     const fromTreasury = Math.min(state.treasury, short);
     state.treasury -= fromTreasury;
     const fromVault = short - fromTreasury;
-    if (fromVault > state.vault + 1e-9) throw new Error("Not enough balance — add lira first.");
+    if (fromVault > state.vault + 1e-9) throw new Error("Not enough balance. Add lira first.");
     if (fromVault > 0) {
       state.vault -= fromVault;
       state.deposited = Math.max(0, state.deposited - fromVault);
@@ -169,7 +169,7 @@ export const demoBackend: Backend = {
     return () => listeners.delete(onEvent);
   },
   async onramp(amountTry) {
-    if (amountTry < 50 || amountTry > 3000) throw new Error("The anchor accepts 50 – 3000 TRY per deposit.");
+    if (amountTry < 50 || amountTry > 3000) throw new Error("The anchor accepts 50 to 3000 TRY per deposit.");
     const id = hash().slice(0, 10);
     emit("onramp.started", null, { anchorTxId: id, amountTry: String(amountTry) }, null);
     void (async () => {
@@ -210,13 +210,13 @@ export const demoBackend: Backend = {
     emit("x402.paid", price, { url }, network);
     const tx = state.events[0].txHash ?? hash();
     timeline.push("payment settled by the facilitator", "200 OK");
-    return { paid: true, status: 200, body: { demo: true, url, note: "Demo response — no request left the browser." }, network, amountUsdc: price, txHash: tx, explorerUrl: null, timeline };
+    return { paid: true, status: 200, body: { demo: true, url, note: "Demo response. No request left the browser." }, network, amountUsdc: price, txHash: tx, explorerUrl: null, timeline };
   },
   async overCapDemo() {
     await wait(900);
     const attempt = Math.max(0, state.cap - usedToday()) + 1;
     emit("float.topup.rejected", attempt, { code: "#3221", reason: "SpendingLimitExceeded" });
-    return `Rejected on-chain: Error(Contract, #3221) SpendingLimitExceeded — tried $${attempt.toFixed(2)} with $${(attempt - 1).toFixed(2)} left under the cap.`;
+    return `Rejected on-chain: Error(Contract, #3221) SpendingLimitExceeded. Tried $${attempt.toFixed(2)} with $${(attempt - 1).toFixed(2)} left under the cap.`;
   },
   async depositDetails() {
     return { iban: "TR00 0000 0000 0000 0000 0000 00", bankName: "Demo Bank", reference: "DEMO-0000", minTry: 50, maxTry: 3000 };
@@ -224,9 +224,14 @@ export const demoBackend: Backend = {
   async cliToken() {
     return "ps_demo-token-not-real";
   },
-  async setCap(capUsdc) {
+  async setCap(capUsdc, _me, rules) {
     await wait(1400); // stands in for the passkey prompt + sponsored submit
     state.cap = capUsdc;
+    if (rules) {
+      state.weeklyCap = rules.weeklyCapUsdc;
+      state.maxPerCall = rules.maxPerCallUsdc;
+      state.networks = rules.allowedNetworks;
+    }
     emit("agent.authorized", capUsdc, { rule: 1, change: "cap" });
   },
 };

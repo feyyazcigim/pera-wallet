@@ -132,9 +132,6 @@ export default function App() {
       <main>
         <section className="hero">
           <motion.div style={{ opacity: heroOpacity, y: heroY, scale: heroScale }}>
-            <motion.p className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <i /> Live on Stellar testnet
-            </motion.p>
             <h1>
               <Line delay={0.05}>Your lira earns.</Line>
               <Line delay={0.18}>
@@ -148,7 +145,7 @@ export default function App() {
               transition={{ duration: 0.6, delay: 0.4 }}
             >
               Send TRY from your bank. It becomes USDC, goes straight into a yield vault, and your AI agent pays for
-              what it needs over x402 — capped by rules you set on-chain.
+              what it needs over x402, capped by rules you set on-chain.
             </motion.p>
             <motion.div className="cta" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}>
               <ArrowFillButton href={DASHBOARD_URL} className="lg" {...LAUNCH_BTN}>
@@ -159,14 +156,6 @@ export default function App() {
               </a>
             </motion.div>
           </motion.div>
-          <motion.span
-            className="scroll-hint"
-            style={{ opacity: heroOpacity }}
-            animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity }}
-          >
-            scroll ↓
-          </motion.span>
         </section>
 
         <div className="pin" ref={pinRef}>
@@ -184,7 +173,7 @@ export default function App() {
         </div>
 
         <TextFillAnimation
-          text="Money in the bank sits still. Money in DeFi is locked away. pera. keeps it earning — and lets your agent spend it."
+          text="Money in the bank sits still. Money in DeFi is locked away. pera. keeps it earning and lets your agent spend it."
           textColor="#0a0a0a"
           primaryColor="#ffd400"
           dimColor="#dedede"
@@ -213,7 +202,7 @@ export default function App() {
             </h2>
             <p>
               Limits live in a Soroban contract, not in a prompt. If the agent tries to overspend, the transaction is
-              rejected by the network — and you can freeze it with one switch.
+              rejected by the network. No prompt can talk its way around that.
             </p>
           </motion.div>
           <motion.div style={{ x: cardX, opacity: cardOpacity }}>

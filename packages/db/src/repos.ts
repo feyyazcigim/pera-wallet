@@ -56,18 +56,20 @@ export async function touchPasskey(credentialId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------- challenges / sessions
-export async function createChallenge(p: { purpose: "register" | "login"; credentialId?: string; ttlMs?: number }): Promise<string> {
+export type ChallengePurpose = "register" | "login" | "rules";
+
+export async function createChallenge(p: { purpose: ChallengePurpose; credentialId?: string; ttlMs?: number; payload?: string }): Promise<string> {
   const db = await getDb();
   const challenge = randomBytes(32).toString("base64url");
-  await db.query("insert into auth_challenges (challenge, purpose, credential_id, expires_at) values ($1, $2, $3, $4)", [challenge, p.purpose, p.credentialId ?? null, new Date(Date.now() + (p.ttlMs ?? 5 * 60_000))]);
+  await db.query("insert into auth_challenges (challenge, purpose, credential_id, expires_at, payload) values ($1, $2, $3, $4, $5)", [challenge, p.purpose, p.credentialId ?? null, new Date(Date.now() + (p.ttlMs ?? 5 * 60_000)), p.payload ?? null]);
   return challenge;
 }
 
 /** Deletes and returns the challenge if it exists and is unexpired. */
-export async function consumeChallenge(challenge: string, purpose: "register" | "login"): Promise<{ credentialId: string | null } | null> {
+export async function consumeChallenge(challenge: string, purpose: ChallengePurpose): Promise<{ credentialId: string | null; payload: string | null } | null> {
   const db = await getDb();
-  const rows = await db.query("delete from auth_challenges where challenge = $1 and purpose = $2 and expires_at > now() returning credential_id", [challenge, purpose]);
-  return rows[0] ? { credentialId: (rows[0].credential_id as string | null) ?? null } : null;
+  const rows = await db.query("delete from auth_challenges where challenge = $1 and purpose = $2 and expires_at > now() returning credential_id, payload", [challenge, purpose]);
+  return rows[0] ? { credentialId: (rows[0].credential_id as string | null) ?? null, payload: (rows[0].payload as string | null) ?? null } : null;
 }
 
 export async function createSession(userId: string, ttlMs = 7 * 24 * 3600_000): Promise<{ token: string; expiresAt: string }> {

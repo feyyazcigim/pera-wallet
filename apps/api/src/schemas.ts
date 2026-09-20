@@ -46,6 +46,7 @@ export const RulesBody = z.object({
   maxPerCallUsdc: DecimalUsdc.nullable(),
   allowedNetworks: z.array(z.enum(["stellar:testnet", "eip155:84532"])).min(1, "allow at least one chain"),
 });
+export const RulesApprovalBody = z.object({ challenge: z.string().min(16), assertion: LoginVerifyBody.shape.assertion });
 export const EvmTransferBody = z.object({ to: z.string().regex(/^0x[0-9a-fA-F]{40}$/), amountUsdc: DecimalUsdc });
 
 export const EventSchema = z.object({
@@ -61,4 +62,4 @@ export const EventSchema = z.object({
 });
 export const ErrorSchema = z.object({ error: z.string(), code: z.string().optional(), errorCode: z.number().optional(), detail: z.unknown().optional() });
 
-export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, RulesBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
+export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, RulesBody, RulesApprovalBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };

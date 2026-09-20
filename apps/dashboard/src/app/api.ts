@@ -84,6 +84,7 @@ export interface Backend {
   position(): Promise<Position | null>;
   policy(): Promise<Policy>;
   rules(): Promise<Rules>;
+  /** Router rules alone: one passkey prompt approves the new ruleset. */
   setRules(input: RulesInput): Promise<Rules>;
   events(): Promise<PeraEvent[]>;
   subscribe(onEvent: (e: PeraEvent) => void): () => void;
@@ -91,7 +92,8 @@ export interface Backend {
   onramp(amountTry: number): Promise<void>;
   pay(url: string, prefer?: PayPrefer): Promise<PayResult>;
   overCapDemo(): Promise<string>; // → the chain's rejection, explained
-  setCap(capUsdc: number, me: Me): Promise<void>;
+  /** Daily cap (on-chain). Pass `rules` to change the router rules under the same single passkey prompt. */
+  setCap(capUsdc: number, me: Me, rules?: RulesInput): Promise<void>;
   /** The IBAN + reference that route a bank transfer to this user (a fresh reference once the last one is used). */
   depositDetails(): Promise<DepositDetails>;
   /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
@@ -195,6 +197,11 @@ const normRules = (r: WireRules): Rules => ({
   spentThisWeekUsdc: usdc(r.spentThisWeekUsdc),
   paymentsThisWeek: r.paymentsThisWeek,
 });
+const wireRules = (input: RulesInput) => ({
+  weeklyCapUsdc: input.weeklyCapUsdc === null ? null : dec(input.weeklyCapUsdc, 7),
+  maxPerCallUsdc: input.maxPerCallUsdc === null ? null : dec(input.maxPerCallUsdc, 7),
+  allowedNetworks: input.allowedNetworks,
+});
 const EVENT_TYPES = ["user.registered", "wallet.provisioned", "agent.authorized", "onramp.started", "onramp.completed", "yield.deposited", "yield.withdrawn", "float.topup", "float.topup.rejected", "x402.402", "x402.paid", "x402.rejected", "bridge.burned", "bridge.attested", "bridge.minted", "offramp.completed"];
 const timelineLabel = (e: WireEvent) => `${e.type}${e.amountUsdc ? ` · ${e.amountUsdc} USDC` : ""}${e.network?.startsWith("eip155") ? " · Base" : ""}`;
 
@@ -252,12 +259,9 @@ const httpBackend: Backend = {
   },
   rules: async () => normRules(await http<WireRules>("/agent/rules")),
   async setRules(input) {
-    const body = {
-      weeklyCapUsdc: input.weeklyCapUsdc === null ? null : dec(input.weeklyCapUsdc, 7),
-      maxPerCallUsdc: input.maxPerCallUsdc === null ? null : dec(input.maxPerCallUsdc, 7),
-      allowedNetworks: input.allowedNetworks,
-    };
-    return normRules(await http<WireRules>("/agent/rules", { method: "PUT", body }));
+    const o = await http<{ challenge: string; rpId: string; allowCredentials: { id: string; type: "public-key" }[] }>("/agent/rules/options", { body: wireRules(input) });
+    const assertion = await startAuthentication({ optionsJSON: { challenge: o.challenge, rpId: o.rpId, allowCredentials: o.allowCredentials, userVerification: "required", timeout: 60_000 } });
+    return normRules(await http<WireRules>("/agent/rules", { method: "PUT", body: { challenge: o.challenge, assertion } }));
   },
   events: async () => (await http<WireEvent[]>("/events?limit=500")).map(normEvent),
   subscribe(onEvent) {
@@ -285,18 +289,18 @@ const httpBackend: Backend = {
   },
   async overCapDemo() {
     const r = await http<WireOverCap>("/agent/pay/over-cap-demo", { body: {} });
-    return `Error(Contract, #${r.errorCode}) ${r.errorName} — ${r.explanation}`;
+    return `Error(Contract, #${r.errorCode}) ${r.errorName}: ${r.explanation}`;
   },
   depositDetails: async () => http<DepositDetails>("/onramp/instructions", { body: {} }),
   cliToken: async () => (await http<{ token: string }>("/cli/token", { body: {} })).token,
   // guide §5.7 — build → passkey signs in the browser (kit.signAdmin) → API submits it sponsored
-  async setCap(capUsdc, me) {
-    if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up — try again in a moment.");
+  async setCap(capUsdc, me, rules) {
+    if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up. Try again in a moment.");
     const dailyCapUsdc = dec(capUsdc, 7);
     const build = await http<{ json: string }>("/agent/policy/build", { body: { dailyCapUsdc } });
     const { signExecuteWithPasskey } = await import("./kit"); // heavy (stellar-sdk + kit): only loaded here
     const xdr = await signExecuteWithPasskey({ contractId: me.smartAccountId, credentialId: me.credentialId, publicKeyB64u: me.passkeyPublicKey }, build.json);
-    await http("/agent/policy", { body: { xdr, dailyCapUsdc } });
+    await http("/agent/policy", { body: { xdr, dailyCapUsdc, rules: rules ? wireRules(rules) : undefined } });
   },
 };
 

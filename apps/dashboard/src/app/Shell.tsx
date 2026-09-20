@@ -53,9 +53,11 @@ function Frame() {
             <MagnetTabs slug="app-nav" options={Object.keys(NAV)} activeTab={active} onSelect={(k) => nav(NAV[k])} />
           </div>
           <div className="app-user">
-            <span className="eyebrow">
-              <i /> {demo ? "demo data" : "Stellar testnet"}
-            </span>
+            {demo && (
+              <span className="eyebrow">
+                <i /> demo data
+              </span>
+            )}
             <b>{me?.displayName ?? "…"}</b>
             <button type="button" onClick={() => void signOut()}>
               Sign out
@@ -64,7 +66,7 @@ function Frame() {
         </div>
       </header>
       <main className="dash-main">
-        {demo && <div className="banner">You're looking at demo data generated in this browser. Nothing here is on-chain — sign out to create a real wallet.</div>}
+        {demo && <div className="banner">You're looking at demo data generated in this browser. Nothing here is on-chain. Sign out to create a real wallet.</div>}
         {error && !demo && <div className="banner warn">{error}</div>}
         <Outlet />
       </main>

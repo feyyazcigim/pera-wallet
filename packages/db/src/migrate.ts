@@ -80,6 +80,7 @@ const STATEMENTS = [
      created_at timestamptz not null default now()
    )`,
   `create index if not exists deposit_orders_user on deposit_orders (user_id, created_at desc)`,
+  `alter table auth_challenges add column if not exists payload text`,
   `create table if not exists agent_rules (
      user_id text primary key references users(id),
      weekly_cap_usdc text,

@@ -47,13 +47,13 @@ export function Analytics() {
     <>
       <header className="page-title">
         <h1>Analytics</h1>
-        <p>Computed from your account's event log — every number traces back to a transaction in History.</p>
+        <p>Computed from your account's event log. Every number traces back to a transaction in History.</p>
       </header>
 
       <Rise className="tiles">
         <Kpi label="Agent spend, all time" value={usd(stats.spent, 3)} loading={loading} />
         <Kpi label="Payments settled" value={String(stats.paid)} loading={loading} />
-        <Kpi label="Average price per call" value={stats.paid ? usd(stats.spent / stats.paid, 4) : "—"} loading={loading} />
+        <Kpi label="Average price per call" value={stats.paid ? usd(stats.spent / stats.paid, 4) : "-"} loading={loading} />
         <Kpi label="Blocked by your rules" value={String(stats.rejected)} loading={loading} hint="rejected on-chain or by the router" />
       </Rise>
 

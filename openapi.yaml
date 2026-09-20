@@ -220,6 +220,46 @@ components:
         - maxPerCallUsdc
         - allowedNetworks
       additionalProperties: false
+    RulesApprovalBody:
+      type: object
+      properties:
+        challenge:
+          type: string
+          minLength: 16
+        assertion:
+          type: object
+          properties:
+            id:
+              type: string
+            rawId:
+              type: string
+            type:
+              type: string
+            response:
+              type: object
+              properties:
+                clientDataJSON:
+                  type: string
+                authenticatorData:
+                  type: string
+                signature:
+                  type: string
+                userHandle:
+                  nullable: true
+                  type: string
+              required:
+                - clientDataJSON
+                - authenticatorData
+                - signature
+              additionalProperties: false
+          required:
+            - id
+            - response
+          additionalProperties: false
+      required:
+        - challenge
+        - assertion
+      additionalProperties: false
     PayBody:
       type: object
       properties:
@@ -586,6 +626,25 @@ paths:
                 additionalProperties: true
         "404": *a1
         "409": *a1
+  /agent/rules/options:
+    post:
+      summary: "Propose a ruleset: returns a single-use WebAuthn challenge bound to
+        it, to be signed by the passkey that owns the wallet"
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RulesBody"
+      responses:
+        "200":
+          description: "{ challenge, rpId, allowCredentials, rules }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /cli/token:
     post:
       summary: Mint a separate session for the CLI (pnpm agent connect <token>); the
@@ -614,15 +673,16 @@ paths:
                 type: object
                 additionalProperties: true
     put:
-      summary: Replace the agent rules; violations make POST /agent/pay answer 409
-        RULE_VIOLATION before anything is signed
+      summary: "Apply the ruleset approved by the owner's passkey: { challenge,
+        assertion } from /agent/rules/options. Violations make POST /agent/pay
+        answer 409 RULE_VIOLATION before anything is signed"
       security: *a2
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RulesBody"
+              $ref: "#/components/schemas/RulesApprovalBody"
       responses:
         "200":
           description: "{ weeklyCapUsdc, maxPerCallUsdc, allowedNetworks,

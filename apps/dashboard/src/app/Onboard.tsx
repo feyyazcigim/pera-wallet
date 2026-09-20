@@ -5,14 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { TextStream } from "@/components/block/text-stream";
 import { EASE, Hl, Line } from "../ui";
-import { api, ApiError, API_URL, session } from "./api";
+import { api, ApiError, session } from "./api";
 
 /** What the API does during the single sign-up request (guide §5.1) — shown while we wait ~30 s. */
 const PROVISION_STEPS = [
-  { label: "Passkey verified", hint: "Your device keeps the key — the server never sees it." },
+  { label: "Passkey verified", hint: "Your device keeps the key. The server never sees it." },
   { label: "Deploying your smart account", hint: "An OpenZeppelin account on Stellar, owned by your passkey." },
   { label: "Writing the agent's spending rule", hint: "A daily cap, enforced by the contract itself." },
-  { label: "Opening treasury and agent accounts", hint: "Reserves and fees are sponsored — you never hold XLM." },
+  { label: "Opening treasury and agent accounts", hint: "Reserves and fees are sponsored, so you never hold XLM." },
   { label: "Creating your Base wallet", hint: "For paywalls on other chains, through Circle CCTP." },
 ];
 const PAYS_FOR = ["LLM calls", "FX rates", "web search", "market data", "translations", "image generation", "cloud compute"];
@@ -85,7 +85,6 @@ export function Onboard() {
         </div>
         <div className="onb-stream">
           <TextStream prefix="Your agent pays for" items={PAYS_FOR} height="150px" fontSize="clamp(1.15rem, 1.7vw, 1.6rem)" fontWeight={700} />
-          <small>Stellar testnet · {API_URL.replace(/^https?:\/\//, "")}</small>
         </div>
       </aside>
 
@@ -148,7 +147,7 @@ export function Onboard() {
                   <h2>
                     Welcome <mark>back</mark>.
                   </h2>
-                  <p className="muted">This browser has a wallet. Your passkey owns it — one prompt and you're in.</p>
+                  <p className="muted">This browser has a wallet and your passkey owns it. One prompt and you're in.</p>
                   <ArrowFillButton as="button" type="button" className="lg" disabled={!supported || busy} onClick={() => void run("login")} {...BTN}>
                     {busy ? "Waiting for your passkey…" : "Continue"}
                   </ArrowFillButton>

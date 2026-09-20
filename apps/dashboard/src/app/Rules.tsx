@@ -45,12 +45,15 @@ export function Rules() {
     setBusy("save");
     setNote(null);
     try {
-      // the router rules are a plain API write; the daily cap lives on-chain and needs the passkey
-      if (!same({ ...form, daily: saved.daily }, saved)) await api().setRules({ weeklyCapUsdc: num(form.weekly), maxPerCallUsdc: num(form.perCall), allowedNetworks: form.chains });
-      if (dailyChanged) await api().setCap(num(form.daily)!, me);
+      // every change is approved by the owner's passkey, exactly once:
+      // a daily-limit change is a signed on-chain transaction (it carries the other rules with it); otherwise the passkey signs the new ruleset itself
+      const router = { weeklyCapUsdc: num(form.weekly), maxPerCallUsdc: num(form.perCall), allowedNetworks: form.chains };
+      const routerChanged = !same({ ...form, daily: saved.daily }, saved);
+      if (dailyChanged) await api().setCap(num(form.daily)!, me, routerChanged ? router : undefined);
+      else await api().setRules(router);
       await refresh();
       setForm(null);
-      setNote({ ok: true, text: dailyChanged ? "Saved. The new daily limit is written to the policy contract; the rest is enforced by the router from now on." : "Saved. The router enforces these on the agent's next payment." });
+      setNote({ ok: true, text: dailyChanged ? "Saved with your passkey. The new daily limit is written to the policy contract, and the router enforces the rest from now on." : "Saved with your passkey. The router enforces these on the agent's next payment." });
     } catch (err) {
       await refresh();
       setNote({ ok: false, text: err instanceof Error ? err.message : String(err) });
@@ -86,7 +89,7 @@ export function Rules() {
               <span>ruleset</span>
               <em>{dirty ? "unsaved changes" : "in force"}</em>
             </header>
-            <Field label="Daily limit" hint={`on-chain · rolling ${hours} h · changing it asks for your passkey`} tag="contract">
+            <Field label="Daily limit" hint={`on-chain · rolling ${hours} h`} tag="contract">
               <Money value={form?.daily ?? ""} onChange={(v) => set({ daily: v })} disabled={!form} />
             </Field>
             <Field label="Weekly limit" hint="rolling 7 days of agent payments · leave empty for no limit" tag="router">
@@ -113,7 +116,7 @@ export function Rules() {
                 reset
               </button>
               <ArrowFillButton as="button" type="submit" disabled={!dirty || !valid || busy !== null} {...BTN}>
-                {busy === "save" ? (dailyChanged ? "Waiting for your passkey…" : "Saving…") : dailyChanged && !session.isDemo() ? "Save · sign with passkey" : "Save rules"}
+                {busy === "save" ? "Waiting for your passkey…" : session.isDemo() ? "Save rules" : "Save · sign with passkey"}
               </ArrowFillButton>
             </div>
           </div>
@@ -125,7 +128,7 @@ export function Rules() {
           <Usage label="This week" sub={`${rules?.paymentsThisWeek ?? 0} payments settled`} used={rules?.spentThisWeekUsdc} cap={rules ? rules.weeklyCapUsdc : null} loading={loading} />
           <div className="prove">
             <h3>Don't take our word for it.</h3>
-            <p>Ask the agent to pull more than the daily limit. The smart account's own policy rejects it — you get the contract's error back, not ours.</p>
+            <p>Ask the agent to pull more than the daily limit. The smart account's own policy rejects it. The error you get back is the contract's, not ours.</p>
             <button type="button" className="term-link ink" disabled={busy !== null} onClick={() => void prove()}>
               {busy === "prove" ? "asking the chain…" : "try to overspend →"}
             </button>
@@ -173,7 +176,7 @@ function Usage({ label, sub, used, cap, loading, link }: { label: string; sub: s
     <div className="usage">
       <small>{label}</small>
       <strong className={loading ? "skeleton" : ""}>
-        {used === undefined ? "—" : usd(used, used < 1 ? 3 : 2)}
+        {used === undefined ? "-" : usd(used, used < 1 ? 3 : 2)}
         <span> / {cap === null ? "no limit" : usd(cap)}</span>
       </strong>
       <div className="meter tall" role="img" aria-label={`${label}: ${used === undefined ? "loading" : usd(used)} used`}>
@@ -203,7 +206,7 @@ function Account({ label, hint, value, href }: { label: string; hint: string; va
         <small>{hint}</small>
       </dt>
       <dd className="mono">
-        {value ? (real ? `${value.slice(0, 8)}…${value.slice(-8)}` : value) : "—"}
+        {value ? (real ? `${value.slice(0, 8)}…${value.slice(-8)}` : value) : "-"}
         {real && (
           <button
             type="button"

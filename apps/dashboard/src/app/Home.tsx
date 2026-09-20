@@ -40,12 +40,12 @@ export function Home() {
         <Rise className="hero-figure" delay={0.35}>
           <div className="hero-total">
             <small>Total balance</small>
-            <strong className={loading ? "skeleton" : ""}>{balances ? <CountUp value={balances.total} format={(n) => usd(n)} /> : "—"}</strong>
+            <strong className={loading ? "skeleton" : ""}>{balances ? <CountUp value={balances.total} format={(n) => usd(n)} /> : "-"}</strong>
           </div>
           <dl className="hero-facts">
             <div>
               <dt>Working in the vault</dt>
-              <dd>{position ? <CountUp value={position.valueUsdc} format={(n) => usd(n)} /> : balances ? usd(balances.vault) : "—"}</dd>
+              <dd>{position ? <CountUp value={position.valueUsdc} format={(n) => usd(n)} /> : balances ? usd(balances.vault) : "-"}</dd>
               <small>{position ? (position.apy !== null ? `${(position.apy > 1 ? position.apy : position.apy * 100).toFixed(2)}% APY` : "DeFindex vault") : "vault not configured on the API"}</small>
             </div>
             <div>
@@ -59,7 +59,7 @@ export function Home() {
             </div>
             <div>
               <dt>Agent budget left today</dt>
-              <dd>{policy ? <CountUp value={policy.remainingUsdc} format={(n) => usd(n)} /> : "—"}</dd>
+              <dd>{policy ? <CountUp value={policy.remainingUsdc} format={(n) => usd(n)} /> : "-"}</dd>
               <div className="meter" role="img" aria-label={policy ? `${usd(policy.usedUsdc)} of ${usd(policy.capUsdc)} used` : "loading"}>
                 <i style={{ width: `${policy ? Math.min(100, (policy.usedUsdc / Math.max(policy.capUsdc, 0.0001)) * 100) : 0}%` }} />
               </div>
@@ -124,7 +124,7 @@ function DepositDetails({ open }: { open: boolean }) {
   return (
     <div className="deposit-box">
       <header>
-        <span>Add lira — send a bank transfer to</span>
+        <span>Add lira: send a bank transfer to</span>
         <button type="button" onClick={() => setShown(false)} aria-label="Hide deposit details">
           hide
         </button>
@@ -141,7 +141,7 @@ function DepositDetails({ open }: { open: boolean }) {
             </button>
           </div>
           <div>
-            <dt>Description — must be exactly this</dt>
+            <dt>Description (must match exactly)</dt>
             <dd className="mono">
               <mark>{details?.reference ?? "…"}</mark>
             </dd>
@@ -152,7 +152,7 @@ function DepositDetails({ open }: { open: boolean }) {
           <div>
             <dt>Amount</dt>
             <dd>
-              ₺{details?.minTry ?? 50} – ₺{(details?.maxTry ?? 3000).toLocaleString("en-US")}
+              ₺{details?.minTry ?? 50} to ₺{(details?.maxTry ?? 3000).toLocaleString("en-US")}
             </dd>
             <button type="button" disabled={!details} onClick={() => details && copy("both", `${details.iban.replace(/\s+/g, "")} ${details.reference}`)}>
               {copied === "both" ? "copied" : "copy both"}
@@ -370,7 +370,7 @@ function AgentConsole() {
 
 function Budget({ pending }: { pending: PeraEvent[] }) {
   const { policy, rules } = useApp();
-  const chains = rules ? NETWORKS.filter((n) => rules.allowedNetworks.includes(n.id)).map((n) => n.label).join(" + ") : "—";
+  const chains = rules ? NETWORKS.filter((n) => rules.allowedNetworks.includes(n.id)).map((n) => n.label).join(" + ") : "-";
   return (
     <section className="rulecard dash-budget">
       <header>
@@ -381,15 +381,15 @@ function Budget({ pending }: { pending: PeraEvent[] }) {
       </header>
       <div className="row">
         <span>Daily limit</span>
-        <b>{policy ? `${usd(policy.usedUsdc)} / ${usd(policy.capUsdc)}` : "—"}</b>
+        <b>{policy ? `${usd(policy.usedUsdc)} / ${usd(policy.capUsdc)}` : "-"}</b>
       </div>
       <div className="row">
         <span>Weekly limit</span>
-        <b>{rules ? `${usd(rules.spentThisWeekUsdc)} / ${rules.weeklyCapUsdc === null ? "no limit" : usd(rules.weeklyCapUsdc)}` : "—"}</b>
+        <b>{rules ? `${usd(rules.spentThisWeekUsdc)} / ${rules.weeklyCapUsdc === null ? "no limit" : usd(rules.weeklyCapUsdc)}` : "-"}</b>
       </div>
       <div className="row">
         <span>Max per call</span>
-        <b>{rules ? (rules.maxPerCallUsdc === null ? "no limit" : usd(rules.maxPerCallUsdc, 3)) : "—"}</b>
+        <b>{rules ? (rules.maxPerCallUsdc === null ? "no limit" : usd(rules.maxPerCallUsdc, 3)) : "-"}</b>
       </div>
       <div className="row">
         <span>Allowed chains</span>
@@ -454,8 +454,8 @@ function History({ events }: { events: PeraEvent[] }) {
                       <i className={`dot ${d.kind}`} />
                       {d.label}
                     </td>
-                    <td className="mono">{e.network?.startsWith("eip155") ? "Base Sepolia" : e.network ? "Stellar" : "—"}</td>
-                    <td className="num mono">{e.amountUsdc === null ? "—" : `${d.sign}${usd(e.amountUsdc, e.amountUsdc < 1 ? 3 : 2)}`}</td>
+                    <td className="mono">{e.network?.startsWith("eip155") ? "Base Sepolia" : e.network ? "Stellar" : "-"}</td>
+                    <td className="num mono">{e.amountUsdc === null ? "-" : `${d.sign}${usd(e.amountUsdc, e.amountUsdc < 1 ? 3 : 2)}`}</td>
                     <td>
                       <time title={new Date(e.ts).toLocaleString()}>{timeAgo(e.ts)}</time>
                     </td>
@@ -467,7 +467,7 @@ function History({ events }: { events: PeraEvent[] }) {
                       ) : e.txHash ? (
                         `${e.txHash.slice(0, 6)}…`
                       ) : (
-                        "—"
+                        "-"
                       )}
                     </td>
                   </tr>
@@ -488,7 +488,7 @@ function Pager({ page, pages, total, onPage }: { page: number; pages: number; to
   return (
     <nav className="pager" aria-label="History pages">
       <span className="mono">
-        {(page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} of {total} · newest first
+        {(page - 1) * PAGE + 1} to {Math.min(page * PAGE, total)} of {total} · newest first
       </span>
       <div>
         <button type="button" disabled={page === 1} onClick={() => onPage(page - 1)} aria-label="Newer">

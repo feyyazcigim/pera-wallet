@@ -56,7 +56,7 @@ export async function anchorRoutes(app: FastifyInstance): Promise<void> {
     const { iban, reference, amountTry } = BankTransferBody.parse(req.body);
     const order = await getDepositOrder(reference);
     if (!order || compact(order.iban) !== compact(iban)) return reply.status(404).send({ error: "no open deposit matches this IBAN and reference", code: "UNKNOWN_REFERENCE" });
-    if (order.status !== "open") return reply.status(409).send({ error: "this reference has already been paid into — the dashboard shows a fresh one", code: "REFERENCE_USED" });
+    if (order.status !== "open") return reply.status(409).send({ error: "this reference has already been paid into. The dashboard shows a fresh one.", code: "REFERENCE_USED" });
     const ctx = await loadContext(order.userId);
     await simulateBankTransfer(order.anchorTxId, amountTry);
     await markDepositOrderFunded(order.reference);
