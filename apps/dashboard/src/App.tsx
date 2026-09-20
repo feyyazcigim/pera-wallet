@@ -131,6 +131,7 @@ export default function App() {
           <nav>
             <a href="#how">How it works</a>
             <a href="#rules">Rules</a>
+            <a href="/roadmap">Roadmap</a>
           </nav>
           <ArrowFillButton href={DASHBOARD_URL} {...LAUNCH_BTN}>
             Launch app

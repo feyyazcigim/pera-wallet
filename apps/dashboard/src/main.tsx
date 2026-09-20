@@ -7,6 +7,7 @@ import Landing from './App.tsx'
 import { Toaster } from './toast.tsx'
 
 // the dashboard is a separate chunk — the landing page doesn't pay for it
+const Roadmap = lazy(() => import('./Roadmap.tsx').then((m) => ({ default: m.Roadmap })))
 const Shell = lazy(() => import('./app/Shell.tsx').then((m) => ({ default: m.Shell })))
 const Onboard = lazy(() => import('./app/Onboard.tsx').then((m) => ({ default: m.Onboard })))
 const Home = lazy(() => import('./app/Home.tsx').then((m) => ({ default: m.Home })))
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')!).render(
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/roadmap" element={<Roadmap />} />
           <Route path="/app/onboard" element={<Onboard />} />
           <Route path="/app" element={<Shell />}>
             <Route index element={<Home />} />
