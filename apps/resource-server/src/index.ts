@@ -38,6 +38,9 @@ const withAuth = (url: string) =>
     isOz(url) && ozHeaders ? { url, createAuthHeaders: async () => ({ verify: ozHeaders, settle: ozHeaders, supported: ozHeaders }) } : { url },
   );
 const facilitators = [withAuth(env.X402_FACILITATOR_URL)];
+// x402.org is the only public facilitator that settles both stellar:testnet and eip155:84532 (Base Sepolia); keep it in
+// the set whenever the primary is something else (OpenZeppelin's is Stellar-only), so the Base routes always have one.
+if (env.X402_FACILITATOR_URL.replace(/\/$/, "") !== X402.defaultFacilitator) facilitators.push(withAuth(X402.defaultFacilitator));
 if (ozHeaders && !isOz(env.X402_FACILITATOR_URL)) facilitators.push(withAuth(X402.ozFacilitatorTestnet));
 // A facilitator that answers /supported with anything but 200 makes every paywalled route 500 — say so at boot.
 try {
