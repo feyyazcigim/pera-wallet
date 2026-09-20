@@ -11,7 +11,6 @@
 
 <p align="center">
   <a href="https://perastellar.xyz">Live app</a> ·
-  <a href="https://perastellar.xyz/roadmap">Roadmap</a> ·
   <a href="openapi.yaml">API contract</a> ·
   <a href="docs/DESIGN.md">Design notes</a> ·
   <a href="DEPLOYMENTS.md">Testnet deployments</a>
@@ -118,7 +117,7 @@ The two contract rules cannot be bypassed by the backend. The router rules prote
 pnpm workspace, TypeScript everywhere, `tsx` at runtime.
 
 ```
-apps/dashboard          landing page, passkey onboarding, dashboard (home, rules, agents, analytics, roadmap)
+apps/dashboard          landing page, passkey onboarding, dashboard (home, rules, agents, analytics)
 apps/api                REST API, MCP server, provisioning, event stream (see openapi.yaml)
 apps/resource-server    x402 paywalls for testing: Stellar, Base, either
 apps/agent              CLI agent and a software passkey for headless end-to-end runs
@@ -215,7 +214,6 @@ Installed locally and consulted while building:
 - [API and MCP reference](docs/API.md)
 - [Testnet deployments](DEPLOYMENTS.md): contracts and transaction hashes
 - [Deploy guide](DEPLOY.md)
-- [Roadmap](https://perastellar.xyz/roadmap)
 
 ## Team
 
