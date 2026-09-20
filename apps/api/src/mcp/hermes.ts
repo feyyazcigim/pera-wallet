@@ -3,7 +3,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
   const mcpUrl = `${apiUrl.replace(/\/$/, "")}/mcp`;
   const config = {
     url: mcpUrl,
-    headers: { Authorization: "Bearer ${env:PERA_AGENT_TOKEN}" },
+    headers: { Authorization: "Bearer ${PERA_AGENT_TOKEN}" },
     trust: "untrusted",
     timeout: 120,
     keepalive_interval: 60,
@@ -15,7 +15,7 @@ export function hermesConnectKit(apiUrl: string, token: string) {
     "  pera_wallet:",
     `    url: "${mcpUrl}"`,
     "    headers:",
-    '      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"',
+    '      Authorization: "Bearer ${PERA_AGENT_TOKEN}"',
     "    trust: untrusted          # payments ask for your confirmation; read tools are free",
     "    timeout: 120",
     "    keepalive_interval: 60",

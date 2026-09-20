@@ -9,7 +9,7 @@ transport:
 auth:
   type: header
   header: Authorization
-  value: "Bearer ${env:PERA_AGENT_TOKEN}"
+  value: "Bearer ${PERA_AGENT_TOKEN}"
   env: PERA_AGENT_TOKEN
 suggest:
   keywords: [pera, x402, paywall, stellar, usdc, wallet, pay]

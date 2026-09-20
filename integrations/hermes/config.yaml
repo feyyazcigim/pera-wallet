@@ -13,9 +13,9 @@ platforms:
 
 mcp_servers:
   pera_wallet:
-    url: "${env:PERA_MCP_URL}"
+    url: "${PERA_MCP_URL}"
     headers:
-      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"
+      Authorization: "Bearer ${PERA_AGENT_TOKEN}"
     trust: trusted              # bot mode: no per-call approval; the on-chain cap + router rules limit what pay_url can do.
                                 # Set "untrusted" to be asked in Telegram before every pay_url.
     timeout: 120                # pay_url may bridge via CCTP (> 60 s)

@@ -133,7 +133,7 @@ export function connectKit(secret: string) {
     "  pera_wallet:",
     `    url: "${mcpUrl}"`,
     "    headers:",
-    '      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"',
+    '      Authorization: "Bearer ${PERA_AGENT_TOKEN}"',
     "    trust: untrusted",
     "    timeout: 120",
     "    keepalive_interval: 60",

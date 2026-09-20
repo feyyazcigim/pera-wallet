@@ -4,7 +4,7 @@ mcp_servers:
   pera_wallet:
     url: "https://<api-host>/mcp"
     headers:
-      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"
+      Authorization: "Bearer ${PERA_AGENT_TOKEN}"
     trust: untrusted            # ask before non-read tools (pay_url); read tools are free
     timeout: 120                # pay_url may bridge via CCTP (> 60 s)
     keepalive_interval: 60
