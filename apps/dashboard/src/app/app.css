@@ -1432,9 +1432,9 @@ h2.section-title:not(.section-head *) {
     border: 1px solid var(--line);
     border-radius: 26px;
     overflow: hidden; /* the active tab's yellow line sits on the bar's own edge */
-    background: rgb(255 255 255 / 0.9);
-    -webkit-backdrop-filter: blur(44px);
-    backdrop-filter: blur(44px);
+    background: rgb(255 255 255 / 0.95);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -18px rgb(0 0 0 / 0.3);
   }
   .app-tabs > div,
