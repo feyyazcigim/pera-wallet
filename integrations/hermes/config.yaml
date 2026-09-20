@@ -1,0 +1,22 @@
+# Seed for HERMES_HOME/config.yaml in the Dokploy deployment (docker-compose.yml copies it on the FIRST boot only;
+# afterwards edit the live copy in the hermes-data volume, or delete it there to re-seed).
+# Model and secrets come from the container environment: HERMES_MODEL, OPENROUTER_API_KEY / ANTHROPIC_API_KEY,
+# TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN, PERA_MCP_URL.
+platforms:
+  telegram:
+    enabled: true
+
+mcp_servers:
+  pera_wallet:
+    url: "${env:PERA_MCP_URL}"
+    headers:
+      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"
+    trust: trusted              # bot mode: no per-call approval; the on-chain cap + router rules limit what pay_url can do.
+                                # Set "untrusted" to be asked in Telegram before every pay_url.
+    timeout: 120                # pay_url may bridge via CCTP (> 60 s)
+    keepalive_interval: 60
+    protocol: auto              # stateless Streamable HTTP
+    tools:
+      include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]
+      resources: false
+      prompts: false

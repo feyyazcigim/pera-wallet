@@ -85,11 +85,15 @@ PUBLIC_API_URL=https://api.<domain> pnpm agent connect <pat_token> && pnpm agent
 ```
 After a redeploy, `GET /events` must still list earlier events (Postgres) and `/data` must persist.
 
-## Hermes (user's machine)
-`~/.hermes/.env`: `PERA_AGENT_TOKEN=pat_…` · `~/.hermes/config.yaml`: `integrations/hermes/config.snippet.yaml` with
-`url: https://api.<domain>/mcp` · `hermes mcp test pera_wallet` · skill:
-`hermes skills install https://raw.githubusercontent.com/feyyazcigim/pera-wallet/main/integrations/hermes/skills/payments/pera-wallet/SKILL.md`.
-If Hermes runs behind its egress allowlist, allow `api.<domain>`.
+## Hermes
+Two ways to attach Nous Hermes Agent, both use the same `pat_…` token from the dashboard (*Connect an agent*):
+
+- **On the user's machine** (CLI/TUI): `integrations/hermes/README.md`, first section — `~/.hermes/.env` gets
+  `PERA_AGENT_TOKEN`, `config.yaml` gets `config.snippet.yaml` with `url: https://api.<domain>/mcp`.
+- **On Dokploy as a Telegram bot** (Compose service, no domain): `integrations/hermes/README.md`, "Run Hermes on a
+  server". Compose Path `./integrations/hermes/docker-compose.yml`; env `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`,
+  `PERA_AGENT_TOKEN`, `PERA_MCP_URL=https://api.<domain>/mcp`, `OPENROUTER_API_KEY` (or `ANTHROPIC_API_KEY`),
+  `HERMES_MODEL`. Builds Hermes from GitHub (≈ 2 GB RAM during the build); persistent volume `hermes-data`.
 
 ## How the Nixpacks config works
 `nixpacks.api.toml` / `nixpacks.resource-server.toml` at the repo root pin Node 22, enable corepack for `pnpm@10.28.2`,

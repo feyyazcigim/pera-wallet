@@ -31,6 +31,29 @@ Try it: `hermes -z "Quote the price of http://<resource-server>/api/stellar/weat
 
 `trust: untrusted` in the snippet makes Hermes ask you before every non-read tool call; drop it once you trust the flow.
 
+## Run Hermes on a server (Dokploy, Telegram bot)
+
+`docker-compose.yml` in this folder builds Hermes from source and runs `hermes gateway` as a Telegram bot with the
+Pera MCP server pre-configured (`config.yaml` is seeded into the persistent `/opt/data` volume on first boot, together
+with the `payments/pera-wallet` skill).
+
+1. Telegram: create a bot with @BotFather (token), get your numeric user id from @userinfobot.
+2. Pera dashboard → *Connect an agent* → copy the `pat_…` token (read + pay).
+3. Dokploy → Create service → **Compose** → GitHub `pera-wallet`, branch `main`, Compose Path
+   `./integrations/hermes/docker-compose.yml`. Environment tab:
+   ```
+   TELEGRAM_BOT_TOKEN=123456:ABC…
+   TELEGRAM_ALLOWED_USERS=<your telegram user id>
+   PERA_AGENT_TOKEN=pat_…
+   PERA_MCP_URL=https://api.<domain>/mcp
+   OPENROUTER_API_KEY=sk-or-…          # or ANTHROPIC_API_KEY
+   HERMES_MODEL=openrouter/anthropic/claude-sonnet-4.5
+   ```
+   No domain is needed (Telegram long-polling). Deploy, then message the bot: "what's my wallet balance?".
+4. Later changes: the live config is `/opt/data/config.yaml` inside the `hermes-data` volume (Dokploy → Compose →
+   Terminal). Deleting it and redeploying re-seeds from this folder. `trust: trusted` means no chat approval before
+   `pay_url` — the on-chain cap and router rules still apply; switch to `untrusted` to be asked every time.
+
 ## Alternatives
 - **stdio** (clients without remote MCP): `npx -y @pera/mcp` with `PERA_API_URL` + `PERA_AGENT_TOKEN` (see `apps/mcp-shim`).
 - **Claude Code**: `claude mcp add --transport http pera https://<api-host>/mcp --header "Authorization: Bearer pat_…"`.

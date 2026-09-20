@@ -1,0 +1,42 @@
+# Hermes Agent as a Telegram bot wired to Pera's MCP server — Dokploy "Compose" service.
+#   Compose Path: ./integrations/hermes/docker-compose.yml (GitHub provider, branch main)
+#   Environment tab: HERMES_MODEL, OPENROUTER_API_KEY (or ANTHROPIC_API_KEY), TELEGRAM_BOT_TOKEN,
+#                    TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram is long-polling (outbound only).
+# Hermes has no published image, so it is built from source (needs ~2 GB RAM at build time).
+services:
+  hermes:
+    build:
+      context: https://github.com/NousResearch/hermes-agent.git#main
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # First boot only: seed config.yaml + the Pera skill into the persistent HERMES_HOME (/opt/data).
+        if [ ! -f /opt/data/config.yaml ]; then
+          cp /opt/seed/config.yaml /opt/data/config.yaml
+          chown "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/config.yaml 2>/dev/null || true
+        fi
+        if [ ! -d /opt/data/skills/payments/pera-wallet ]; then
+          mkdir -p /opt/data/skills/payments
+          cp -r /opt/seed/skills/payments/pera-wallet /opt/data/skills/payments/
+          chown -R "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/skills 2>/dev/null || true
+        fi
+        exec /opt/hermes/docker/entrypoint-dispatch.sh gateway run
+    environment:
+      HERMES_UID: ${HERMES_UID:-10000}
+      HERMES_GID: ${HERMES_GID:-10000}
+      HERMES_MODEL: ${HERMES_MODEL:-openrouter/anthropic/claude-sonnet-4.5}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS}
+      PERA_AGENT_TOKEN: ${PERA_AGENT_TOKEN}
+      PERA_MCP_URL: ${PERA_MCP_URL:-https://api.perastellar.xyz/mcp}
+      TERMINAL_ENV: local
+    volumes:
+      - hermes-data:/opt/data
+      - ./config.yaml:/opt/seed/config.yaml:ro
+      - ./skills:/opt/seed/skills:ro
+
+volumes:
+  hermes-data:
