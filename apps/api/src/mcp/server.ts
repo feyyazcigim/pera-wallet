@@ -22,7 +22,9 @@ export interface McpPrincipal {
 
 type ToolResult = { content: Array<{ type: "text"; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
 
-const ok = (summary: string, data: Record<string, unknown>): ToolResult => ({ content: [{ type: "text", text: summary }], structuredContent: data });
+// The text block carries the data too: MCP clients (Hermes included) hand the model `content`, not `structuredContent`,
+// so a pay_url result with the paid body only in structuredContent reads as "paid, no data".
+const ok = (summary: string, data: Record<string, unknown>): ToolResult => ({ content: [{ type: "text", text: `${summary}\n${JSON.stringify(data)}` }], structuredContent: data });
 const fail = (code: string, message: string, data: Record<string, unknown> = {}): ToolResult => ({ content: [{ type: "text", text: `${code}: ${message}` }], structuredContent: { error: code, message, ...data }, isError: true });
 
 function truncate(body: unknown, max = 8_000): unknown {
