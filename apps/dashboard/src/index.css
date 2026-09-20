@@ -67,31 +67,6 @@ mark {
   height: var(--nav-h);
   pointer-events: none;
 }
-/* Under the header the page dissolves the way the text stream does at its edges: the closer to the top,
-   the more blurred and faded. Two masked blur layers make the ramp; the white wash finishes it. */
-.nav::before,
-.nav::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: -1;
-  pointer-events: none;
-}
-.nav::before {
-  height: calc(var(--nav-h) + 72px);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
-}
-.nav::after {
-  height: calc(var(--nav-h) + 36px);
-  background: linear-gradient(to bottom, rgb(255 255 255 / 0.92) 0%, rgb(255 255 255 / 0.6) 55%, rgb(255 255 255 / 0) 100%);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
-}
 .nav-inner {
   display: flex;
   align-items: center;
@@ -99,18 +74,18 @@ mark {
   width: 100%;
   border: 1px solid transparent;
   border-bottom-color: var(--line);
-  background: rgb(255 255 255 / 0.95);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgb(255 255 255 / 0.72);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   pointer-events: auto;
   transition: border-color 0.4s, background 0.4s, box-shadow 0.4s;
 }
 .nav.pill .nav-inner {
   border-color: var(--line);
-  /* nearly solid white; the light blur only softens whatever passes underneath */
-  background: rgb(255 255 255 / 0.95);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  /* frosted: what passes underneath stays visible, but only as soft, muffled shifts of tone */
+  background: rgb(255 255 255 / 0.72);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -22px rgb(0 0 0 / 0.22);
 }
 .nav nav {
