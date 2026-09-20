@@ -67,6 +67,31 @@ mark {
   height: var(--nav-h);
   pointer-events: none;
 }
+/* Under the header the page dissolves the way the text stream does at its edges: the closer to the top,
+   the more blurred and faded. Two masked blur layers make the ramp; the white wash finishes it. */
+.nav::before,
+.nav::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  pointer-events: none;
+}
+.nav::before {
+  height: calc(var(--nav-h) + 72px);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
+}
+.nav::after {
+  height: calc(var(--nav-h) + 36px);
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.92) 0%, rgb(255 255 255 / 0.6) 55%, rgb(255 255 255 / 0) 100%);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+}
 .nav-inner {
   display: flex;
   align-items: center;
