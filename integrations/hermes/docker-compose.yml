@@ -2,11 +2,10 @@
 #   Compose Path: ./integrations/hermes/docker-compose.yml (GitHub provider, branch main)
 #   Environment tab: AWS_BEARER_TOKEN_BEDROCK (or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY), AWS_REGION, HERMES_MODEL,
 #                    TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram long-polls.
-# Hermes has no published image, so it is built from source (needs ~2 GB RAM at build time).
+# Uses the official image (docker.io/nousresearch/hermes-agent, ~1 GB pull) — nothing is built on the server.
 services:
   hermes:
-    build:
-      context: https://github.com/NousResearch/hermes-agent.git#main
+    image: nousresearch/hermes-agent:v2026.9.14   # pin; bump deliberately (`:latest` tracks main)
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c"]
     command:

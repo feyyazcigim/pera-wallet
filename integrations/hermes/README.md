@@ -33,7 +33,7 @@ Try it: `hermes -z "Quote the price of http://<resource-server>/api/stellar/weat
 
 ## Run Hermes on a server (Dokploy, Telegram bot)
 
-`docker-compose.yml` in this folder builds Hermes from source and runs `hermes gateway` as a Telegram bot with the
+`docker-compose.yml` in this folder runs the official `nousresearch/hermes-agent` image as `hermes gateway` as a Telegram bot with the
 Pera MCP server pre-configured (`config.yaml` is seeded into the persistent `/opt/data` volume on first boot, together
 with the `payments/pera-wallet` skill).
 
