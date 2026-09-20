@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { FlowScene, type FlowSceneHandle, type FlowStep } from "../FlowScene";
 import { CountUp, Hl, Line, Rise } from "../ui";
-import { api, session, CapExceededError, NETWORKS, type DepositDetails as DepositDetailsT, RESOURCE_SERVER_URL, RuleViolationError, type PayPrefer, type PayResult, type PeraEvent } from "./api";
+import { api, session, NETWORKS, type DepositDetails as DepositDetailsT, type PeraEvent } from "./api";
 import { describe, pendingOf, shortUrl, timeAgo, usd, useApp, type EventKind } from "./store";
 
 const FILTERS: Record<string, "all" | EventKind> = { All: "all", Deposits: "deposit", Vault: "yield", Agent: "agent", Bridge: "bridge" };
-const BTN = { bgColor: "#ffd400", textColor: "#0a0a0a", fillBgColor: "#0a0a0a", fillTextColor: "#ffd400", hoverFillBgColor: "#0a0a0a", hoverFillTextColor: "#ffd400" };
 
 /** Short paywall name for the flow scene's small service boxes: the last path segment ("weather"). */
 const svcName = (url: unknown): string | null => (typeof url === "string" ? (shortUrl(url).split("/").filter(Boolean).pop() ?? null) : null);
@@ -75,8 +73,7 @@ export function Home() {
 
       <LiveFlow />
 
-      <Rise className="dash-cols">
-        <AgentConsole />
+      <Rise className="dash-section">
         <Budget pending={pending} />
       </Rise>
 
@@ -271,120 +268,6 @@ function LiveFlow() {
         }}
       />
     </Rise>
-  );
-}
-
-// the three demo paywalls of apps/resource-server
-const PRESETS: Record<string, { url: string; prefer: PayPrefer }> = {
-  "weather · Stellar": { url: `${RESOURCE_SERVER_URL}/api/stellar/weather`, prefer: "auto" },
-  "summary · Base": { url: `${RESOURCE_SERVER_URL}/api/base/summary`, prefer: "evm" },
-  "quote · either": { url: `${RESOURCE_SERVER_URL}/api/any/quote`, prefer: "auto" },
-};
-
-/** A terminal, like the one on the landing page — except this one really sends the agent out. */
-function AgentConsole() {
-  const { refresh } = useApp();
-  const [preset, setPreset] = useState(Object.keys(PRESETS)[0]);
-  const [url, setUrl] = useState(PRESETS[preset].url);
-  const [prefer, setPrefer] = useState<PayPrefer>("auto");
-  const [busy, setBusy] = useState<null | "pay" | "cap">(null);
-  const [result, setResult] = useState<PayResult | null>(null);
-  const [error, setError] = useState<{ text: string; kind: "cap" | "rule" | "err" } | null>(null);
-
-  async function run(fn: () => Promise<void>, which: "pay" | "cap") {
-    setBusy(which);
-    setError(null);
-    setResult(null);
-    try {
-      await fn();
-    } catch (err) {
-      setError({ text: err instanceof Error ? err.message : String(err), kind: err instanceof CapExceededError ? "cap" : err instanceof RuleViolationError ? "rule" : "err" });
-    } finally {
-      setBusy(null);
-      void refresh();
-    }
-  }
-  const pay = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => setResult(await api().pay(url.trim(), prefer)), "pay");
-  };
-  const overCap = () => void run(async () => setError({ text: await api().overCapDemo(), kind: "cap" }), "cap");
-
-  return (
-    <section className="term">
-      <header>
-        <span>agent console</span>
-        <em>x402</em>
-      </header>
-      <div className="term-tabs">
-        <MagnetTabs
-          slug="paywall"
-          options={Object.keys(PRESETS)}
-          activeTab={preset}
-          onSelect={(k) => {
-            setPreset(k);
-            setUrl(PRESETS[k].url);
-            setPrefer(PRESETS[k].prefer);
-          }}
-        />
-      </div>
-      <form onSubmit={pay}>
-        <label className="term-line mono">
-          <span>$ pera pay</span>
-          <input
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              setPrefer("auto");
-            }}
-            spellCheck={false}
-            aria-label="Paywalled URL"
-          />
-        </label>
-        <div className="term-actions">
-          <ArrowFillButton as="button" type="submit" disabled={busy !== null || !url.trim()} {...BTN}>
-            {busy === "pay" ? "Paying…" : "Send the agent"}
-          </ArrowFillButton>
-          <button type="button" className="term-link" disabled={busy !== null} onClick={overCap}>
-            {busy === "cap" ? "asking the chain…" : "try to overspend →"}
-          </button>
-        </div>
-      </form>
-      <div className="term-out mono" aria-live="polite">
-        {!result && !error && <p className="dim">{busy ? "› working…" : "› the agent's receipt shows up here"}</p>}
-        {result && (
-          <>
-            {result.timeline.map((t, i) => (
-              <p key={i} className="dim">
-                › {t}
-              </p>
-            ))}
-            <p>
-              <mark>{result.paid ? "paid" : `HTTP ${result.status}`}</mark>
-              {result.amountUsdc !== null && ` ${usd(result.amountUsdc, 3)}`}
-              {result.network && ` on ${result.network.startsWith("eip155") ? "Base Sepolia" : "Stellar"}`}
-              {result.explorerUrl && (
-                <>
-                  {" · "}
-                  <a href={result.explorerUrl} target="_blank" rel="noreferrer">
-                    transaction ↗
-                  </a>
-                </>
-              )}
-            </p>
-            <pre>{typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2)}</pre>
-          </>
-        )}
-        {error && (
-          <>
-            <p>
-              <mark>{error.kind === "cap" ? "the contract said no" : error.kind === "rule" ? "blocked by your rules" : "error"}</mark>
-            </p>
-            <p>{error.text}</p>
-          </>
-        )}
-      </div>
-    </section>
   );
 }
 
