@@ -81,7 +81,7 @@ export function Agents() {
                   <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} aria-label="key name" />
                 </label>
               </div>
-              <div className="row field">
+              <div className="row field scopes-row">
                 <div>
                   <span>Scopes</span>
                   <small>what the agent may call</small>
@@ -97,26 +97,6 @@ export function Agents() {
                     );
                   })}
                 </div>
-              </div>
-              <div className="row field key-can">
-                <div>
-                  <span>This key</span>
-                  <small>follows the scopes you picked</small>
-                </div>
-                <ul>
-                  {SCOPES.map((sc) => (
-                    <li key={sc.id} className={scopes.includes(sc.id) ? "yes" : "off"}>
-                      <i>{scopes.includes(sc.id) ? "✓" : "·"}</i>
-                      {sc.id === "read" ? "sees balances, limits, quotes and history" : "pays x402 paywalls inside your rules"}
-                    </li>
-                  ))}
-                  <li className="no">
-                    <i>✕</i>never moves funds elsewhere
-                  </li>
-                  <li className="no">
-                    <i>✕</i>never adds money or changes your rules
-                  </li>
-                </ul>
               </div>
               <div className="row save-row">
                 <ArrowFillButton as="button" type="submit" disabled={busy !== null || !name.trim() || scopes.length === 0} {...BTN}>

@@ -1669,43 +1669,29 @@ h2.section-title:not(.section-head *) {
 .connect-foot {
   margin-top: auto !important;
 }
-.key-can {
+/* the scopes row takes the height that is left: read and pay stack as two full-width choices */
+.scopes-row {
   flex: 1;
-  align-items: flex-start !important;
+  align-items: stretch !important;
 }
-.key-can ul {
-  display: flex;
+.scopes-row .chain-toggles {
+  flex: 1;
   flex-direction: column;
-  gap: 9px;
-  margin: 2px 0 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--mono);
-  font-size: 12.5px;
-}
-.key-can li {
-  display: flex;
   gap: 10px;
 }
-.key-can li i {
-  flex: none;
-  align-self: flex-start;
-  width: 1.35em;
-  height: 1.35em;
-  line-height: 1.35em;
-  font-style: normal;
-  text-align: center;
+.scopes-row .chain-toggles button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 20px;
+  text-align: left;
 }
-.key-can li.yes i {
-  border-radius: 4px;
-  background: var(--yellow);
-  color: var(--ink);
-}
-.key-can li.off {
-  color: #b4b4b4;
-}
-.key-can li.no {
-  color: var(--muted);
+/* on Rules the card tucks under its preset tabs; here it stands alone, so all four corners match */
+.keys-left .rules-editor .rulecard {
+  border-top-left-radius: 18px;
 }
 .connect-tabs {
   padding: 14px 22px 0;
