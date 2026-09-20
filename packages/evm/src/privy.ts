@@ -65,6 +65,7 @@ export async function createPrivyWalletForUser(p: { userId: string; email?: stri
   }
 
   const w = await privy.wallets().create({
+    chain_type: "ethereum",
     external_id: externalId,
     entity: privyUserId ? { id: privyUserId, type: "user" } : undefined,
     idempotency_key: `pera-evm-${p.userId}`,
