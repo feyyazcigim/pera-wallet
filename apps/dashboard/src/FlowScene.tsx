@@ -70,7 +70,12 @@ function paymentKeyframes(sy: number) {
 type Particle = { id: number; svc: number };
 
 /** Real numbers for the dashboard; anything left out falls back to the landing page's illustration values. */
-export type FlowLive = { quote?: string; quoteSub?: string; staked?: number; earned?: number; spent?: number; calls?: number; cap?: number; services?: string[] };
+/**
+ * `spent` is what the agent actually paid over x402 today. `drawn` is a different number: the budget the contract
+ * has released to the agent's float today, which is what the on-chain daily cap meters. The float is topped up in
+ * chunks, so `drawn` moves rarely and `spent` moves on every payment.
+ */
+export type FlowLive = { quote?: string; quoteSub?: string; staked?: number; earned?: number; spent?: number; drawn?: number; calls?: number; cap?: number; services?: string[] };
 type Props = { step?: FlowStep; command?: string; autoPay?: boolean; live?: FlowLive };
 
 export const FlowScene = forwardRef<FlowSceneHandle, Props>(function FlowScene(
@@ -307,21 +312,42 @@ export const FlowScene = forwardRef<FlowSceneHandle, Props>(function FlowScene(
         </Tag>
 
         {/* agent spend */}
-        <Tag show={step >= 4} x={900} y={134} w={236} h={76}>
-          <text x={-102} y={-12} fontSize={10.5} fontFamily={MONO} fill={MUTED}>
-            AGENT SPEND TODAY
-          </text>
-          <text x={-102} y={10} fontSize={17} fontWeight={800} fill={INK}>
-            ${(live?.spent ?? spent).toFixed(3)}
-            <tspan fontSize={12} fontWeight={500} fill={MUTED}>
-              {"  "}
-              {live?.calls ?? calls} calls
-            </tspan>
-          </text>
-          <text x={-102} y={27} fontSize={10.5} fontFamily={MONO} fill={INK}>
-            cap ${(live?.cap ?? 5).toFixed(2)}/day · enforced on-chain
-          </text>
-        </Tag>
+        {live?.drawn === undefined ? (
+          <Tag show={step >= 4} x={900} y={134} w={236} h={76}>
+            <text x={-102} y={-12} fontSize={10.5} fontFamily={MONO} fill={MUTED}>
+              AGENT SPEND TODAY
+            </text>
+            <text x={-102} y={10} fontSize={17} fontWeight={800} fill={INK}>
+              ${(live?.spent ?? spent).toFixed(3)}
+              <tspan fontSize={12} fontWeight={500} fill={MUTED}>
+                {"  "}
+                {live?.calls ?? calls} calls
+              </tspan>
+            </text>
+            <text x={-102} y={27} fontSize={10.5} fontFamily={MONO} fill={INK}>
+              cap ${(live?.cap ?? 5).toFixed(2)}/day · enforced on-chain
+            </text>
+          </Tag>
+        ) : (
+          <Tag show={step >= 4} x={900} y={126} w={236} h={94}>
+            <text x={-102} y={-22} fontSize={10.5} fontFamily={MONO} fill={MUTED}>
+              AGENT SPENT TODAY
+            </text>
+            <text x={-102} y={0} fontSize={17} fontWeight={800} fill={INK}>
+              ${(live.spent ?? 0).toFixed(3)}
+              <tspan fontSize={12} fontWeight={500} fill={MUTED}>
+                {"  "}
+                {live.calls ?? 0} {live.calls === 1 ? "call" : "calls"}
+              </tspan>
+            </text>
+            <text x={-102} y={19} fontSize={10.5} fontFamily={MONO} fill={INK}>
+              budget drawn ${live.drawn.toFixed(2)} of ${(live.cap ?? 0).toFixed(2)}
+            </text>
+            <text x={-102} y={34} fontSize={10.5} fontFamily={MONO} fill={MUTED}>
+              daily cap · enforced on-chain
+            </text>
+          </Tag>
+        )}
 
         {/* yield sparks */}
         {step >= 4 &&

@@ -240,6 +240,7 @@ function LiveFlow() {
     };
   }, [onLive]);
 
+  const paidToday = paid.filter((e) => Date.now() - Date.parse(e.ts) < 24 * 3600 * 1000);
   const lastDeposit = events.find((e) => e.type === "onramp.completed");
   const latest = events.find((e) => e.type !== "x402.402");
   const tryAmt = lastDeposit ? tryOf(lastDeposit) : null;
@@ -261,8 +262,9 @@ function LiveFlow() {
           quoteSub: lastDeposit && tryAmt && lastDeposit.amountUsdc ? `quote locked @ ${(tryAmt / lastDeposit.amountUsdc).toFixed(2)}` : "quote locked by the anchor",
           staked: position?.valueUsdc ?? balances?.vault ?? 0,
           earned: earnedUsdc,
-          spent: policy?.usedUsdc ?? 0,
-          calls: paid.filter((e) => Date.now() - Date.parse(e.ts) < 24 * 3600 * 1000).length,
+          spent: paidToday.reduce((a, e) => a + (e.amountUsdc ?? 0), 0),
+          drawn: policy?.usedUsdc ?? 0,
+          calls: paidToday.length,
           cap: policy?.capUsdc,
           services,
         }}
