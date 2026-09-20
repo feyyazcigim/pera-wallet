@@ -1807,3 +1807,116 @@ h2.section-title:not(.section-head *) {
     min-height: 0;
   }
 }
+
+/* ── multi-select dropdown (allowed chains): the same box as the money inputs, a small menu under it ── */
+.select {
+  position: relative;
+  flex: none;
+  width: 190px;
+}
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.select-trigger:hover,
+.select.open .select-trigger {
+  border-color: var(--ink);
+}
+.select.open .select-trigger {
+  background: linear-gradient(var(--yellow), var(--yellow)) no-repeat left bottom / 100% 3px;
+}
+.select-trigger > i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: rotate(45deg);
+  transition: transform 0.2s;
+}
+.select.open .select-trigger > i {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+.select-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 100%;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--lift);
+  list-style: none;
+}
+.select-menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.select-menu button:hover:not(:disabled) {
+  background: var(--soft);
+}
+.select-menu button:disabled {
+  cursor: default;
+}
+.select-menu button > i {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #cfcfcf;
+  border-radius: 5px;
+  font-size: 11px;
+  font-style: normal;
+}
+.select-menu button > i.on {
+  border-color: var(--ink);
+  background: var(--yellow);
+}
+.select-menu small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* the menu hangs below its row, so this card cannot clip; its strips carry the rounding instead */
+.rules-grid .rules-editor .rulecard {
+  overflow: visible;
+}
+.rules-grid .rules-editor .rulecard > header {
+  border-top-right-radius: 17px;
+}
+.rules-grid .rules-editor .rulecard > .save-row {
+  border-radius: 0 0 17px 17px;
+}

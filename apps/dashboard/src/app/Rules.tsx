@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
 import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { Rise } from "../ui";
@@ -119,17 +119,7 @@ export function Rules() {
               <Money value={form?.perCall ?? ""} onChange={(v) => set({ perCall: v })} disabled={!form} placeholder="no limit" />
             </Field>
             <Field label="Allowed chains" hint="where the agent may pay · at least one" tag="router">
-              <div className="chain-toggles">
-                {NETWORKS.map((n) => {
-                  const on = form?.chains.includes(n.id) ?? false;
-                  return (
-                    <button key={n.id} type="button" aria-pressed={on} className={on ? "on" : ""} disabled={!form} onClick={() => form && set({ chains: on ? form.chains.filter((c) => c !== n.id) : [...form.chains, n.id] })}>
-                      {n.label}
-                      <small>{n.hint}</small>
-                    </button>
-                  );
-                })}
-              </div>
+              <ChainSelect value={form?.chains ?? []} disabled={!form} onChange={(chains) => set({ chains })} />
             </Field>
             <div className="row save-row">
               <button type="button" className="term-link ink" disabled={!dirty || busy !== null} onClick={() => setForm(saved)}>
@@ -197,6 +187,52 @@ function Field({ label, hint, tag, children }: { label: string; hint: string; ta
         <small>{hint}</small>
       </div>
       {children}
+    </div>
+  );
+}
+/** Multi-select dropdown for the chains the agent may pay on. The last ticked chain cannot be unticked. */
+function ChainSelect({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const picked = NETWORKS.filter((n) => value.includes(n.id));
+  return (
+    <div className={`select ${open ? "open" : ""}`} ref={box}>
+      <button type="button" className="select-trigger" aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
+        <span>{picked.length ? picked.map((n) => n.label).join(" + ") : "choose"}</span>
+        <i aria-hidden="true" />
+      </button>
+      {open && (
+        <ul className="select-menu" role="listbox" aria-multiselectable="true" aria-label="Allowed chains">
+          {NETWORKS.map((n) => {
+            const on = value.includes(n.id);
+            const last = on && value.length === 1;
+            return (
+              <li key={n.id} role="option" aria-selected={on}>
+                <button type="button" disabled={last} title={last ? "At least one chain stays allowed" : undefined} onClick={() => onChange(on ? value.filter((c) => c !== n.id) : [...value, n.id])}>
+                  <i className={on ? "on" : ""} aria-hidden="true">
+                    {on ? "✓" : ""}
+                  </i>
+                  <span>
+                    {n.label}
+                    <small>{n.hint}</small>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
