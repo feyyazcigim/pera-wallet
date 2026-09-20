@@ -30,6 +30,14 @@ try {
 const payToEvm = env.MERCHANT_EVM_ADDRESS ?? (isPrivyConfigured() ? (await ensureAppWallet("merchant")).address : undefined);
 
 const facilitators = [new HTTPFacilitatorClient({ url: env.X402_FACILITATOR_URL })];
+// A facilitator that answers /supported with anything but 200 makes every paywalled route 500 — say so at boot
+// (typical: X402_FACILITATOR_URL pointed at OpenZeppelin's, which needs OZ_FACILITATOR_API_KEY; x402.org needs no key).
+try {
+  const r = await fetch(`${env.X402_FACILITATOR_URL.replace(/\/$/, "")}/supported`);
+  if (!r.ok) log.error({ facilitator: env.X402_FACILITATOR_URL, status: r.status }, "facilitator rejected /supported — paywalled routes will fail; use https://x402.org/facilitator or add OZ_FACILITATOR_API_KEY");
+} catch (err) {
+  log.error({ err, facilitator: env.X402_FACILITATOR_URL }, "facilitator unreachable");
+}
 if (env.OZ_FACILITATOR_API_KEY) {
   const headers = { Authorization: `Bearer ${env.OZ_FACILITATOR_API_KEY}` };
   facilitators.push(
