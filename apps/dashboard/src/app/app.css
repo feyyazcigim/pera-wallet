@@ -836,6 +836,10 @@ button:disabled {
   color: var(--paper);
   overflow: hidden;
 }
+/* logo on top, the headline centred in what is left */
+.onb-side > div {
+  margin: auto 0;
+}
 .onb-side h1 {
   margin: 0 0 24px;
   font-size: clamp(52px, 5.4vw, 88px);
@@ -849,25 +853,6 @@ button:disabled {
   max-width: 460px;
   font-size: 19px;
   color: #b5b5b5;
-}
-.onb-stream .obsidian-text-stream {
-  letter-spacing: -0.04em;
-  color: var(--paper);
-}
-.onb-stream .obsidian-text-stream > div:first-child {
-  width: auto !important;
-  padding-right: 0.35em !important;
-}
-.onb-stream .obsidian-text-stream__viewport {
-  width: auto !important;
-  flex: 1;
-}
-.onb-stream small {
-  display: block;
-  margin-top: 18px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: #8a8a8a;
 }
 .onb-main {
   display: grid;
@@ -992,10 +977,6 @@ button:disabled {
 }
 .onb-steps .steps-body p {
   padding: 0 0 14px 38px;
-}
-.onb-stream .obsidian-text-stream p {
-  max-width: none;
-  color: var(--paper);
 }
 .onb-demo.quiet {
   margin-top: 8px;
@@ -1612,11 +1593,7 @@ h2.section-title:not(.section-head *) {
   .onb-side p {
     font-size: 16px;
   }
-  /* the streaming list is decoration; on a phone the form should be one thumb away */
-  .onb-stream {
-    display: none;
-  }
-  .onb-main {
+    .onb-main {
     place-items: start stretch;
     padding: 28px 16px 56px;
   }

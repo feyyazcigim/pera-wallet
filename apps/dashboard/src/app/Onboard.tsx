@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
-import { TextStream } from "@/components/block/text-stream";
 import { EASE, Hl, Line } from "../ui";
 import { api, ApiError, session } from "./api";
 
@@ -15,7 +14,6 @@ const PROVISION_STEPS = [
   { label: "Opening treasury and agent accounts", hint: "Reserves and fees are sponsored, so you never hold XLM." },
   { label: "Creating your EVM wallet", hint: "For paywalls on other chains, through Circle CCTP." },
 ];
-const PAYS_FOR = ["LLM calls", "FX rates", "web search", "market data", "translations", "image generation", "cloud compute"];
 const BTN = { bgColor: "#0a0a0a", textColor: "#ffffff", fillBgColor: "#ffd400", fillTextColor: "#0a0a0a", hoverFillBgColor: "#ffd400", hoverFillTextColor: "#0a0a0a" };
 /** idle → checking (is there a passkey on this device?) → creating (no: provision a wallet) */
 type Phase = "idle" | "checking" | "creating";
@@ -78,9 +76,6 @@ export function Onboard() {
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.45 }}>
             Face ID or Touch ID creates your wallet. After that, lira comes in, earns in a vault, and your agent pays within limits that you set.
           </motion.p>
-        </div>
-        <div className="onb-stream">
-          <TextStream prefix="Your agent pays for" items={PAYS_FOR} height="150px" fontSize="clamp(1.15rem, 1.7vw, 1.6rem)" fontWeight={700} />
         </div>
       </aside>
 
