@@ -1,0 +1,26 @@
+{
+  "name": "@pera/mcp",
+  "version": "0.1.0",
+  "description": "stdio shim for the Pera Agent Wallet MCP server — proxies to the remote Streamable HTTP endpoint with your agent token",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "pera-mcp": "./bin/pera-mcp.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "tsx": "4.23.13"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

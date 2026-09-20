@@ -7,6 +7,7 @@ import { loadEnv } from "@pera/core";
 const env = loadEnv();
 const fast = process.argv.includes("--fast");
 const base = env.PUBLIC_API_URL.replace(/\/$/, "");
+if (!env.RESOURCE_SERVER_URL) throw new Error("RESOURCE_SERVER_URL is required for this script (start the demo resource server: pnpm dev:rs)");
 const rs = env.RESOURCE_SERVER_URL.replace(/\/$/, "");
 const headers = { "content-type": "application/json", authorization: `Bearer ${env.API_BEARER_TOKEN}` };
 const pause = (ms: number) => new Promise((r) => setTimeout(r, fast ? 200 : ms));

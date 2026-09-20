@@ -1,0 +1,45 @@
+# Hermes Agent as a Telegram bot wired to Pera's MCP server — Dokploy "Compose" service.
+#   Compose Path: ./integrations/hermes/docker-compose.yml (GitHub provider, branch main)
+#   Environment tab: AWS_BEARER_TOKEN_BEDROCK (or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY), AWS_REGION, HERMES_MODEL,
+#                    TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram long-polls.
+# Uses the official image (docker.io/nousresearch/hermes-agent, ~1 GB pull) — nothing is built on the server.
+services:
+  hermes:
+    image: nousresearch/hermes-agent:v2026.9.14   # pin; bump deliberately (`:latest` tracks main)
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # First boot only: seed config.yaml + the Pera skill into the persistent HERMES_HOME (/opt/data).
+        if [ ! -f /opt/data/config.yaml ]; then
+          cp /opt/seed/config.yaml /opt/data/config.yaml
+          chown "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/config.yaml 2>/dev/null || true
+        fi
+        if [ ! -d /opt/data/skills/payments/pera-wallet ]; then
+          mkdir -p /opt/data/skills/payments
+          cp -r /opt/seed/skills/payments/pera-wallet /opt/data/skills/payments/
+          chown -R "$${HERMES_UID:-10000}:$${HERMES_GID:-10000}" /opt/data/skills 2>/dev/null || true
+        fi
+        exec /opt/hermes/docker/entrypoint-dispatch.sh gateway run
+    environment:
+      HERMES_UID: ${HERMES_UID:-10000}
+      HERMES_GID: ${HERMES_GID:-10000}
+      HERMES_MODEL: ${HERMES_MODEL:-moonshotai.kimi-k2.5}
+      # AWS Bedrock (the image ships boto3): either a Bedrock API key or IAM keys; region must have model access enabled.
+      AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS}
+      PERA_AGENT_TOKEN: ${PERA_AGENT_TOKEN}
+      PERA_MCP_URL: ${PERA_MCP_URL:-https://api.perastellar.xyz/mcp}
+      TERMINAL_ENV: local
+    volumes:
+      - hermes-data:/opt/data
+      - ./config.yaml:/opt/seed/config.yaml:ro
+      - ./skills:/opt/seed/skills:ro
+
+volumes:
+  hermes-data:

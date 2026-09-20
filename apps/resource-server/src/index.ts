@@ -9,7 +9,7 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { HTTPFacilitatorClient, type RouteConfig } from "@x402/core/server";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
-import { ensureAppWallet } from "@pera/evm";
+import { ensureAppWallet, isPrivyConfigured } from "@pera/evm";
 import { BASE_SEPOLIA_CAIP2, childLogger, derivedKeys, loadEnv, STELLAR_CAIP2, X402 } from "@pera/core";
 import { fetchIstanbulWeather } from "./weather";
 
@@ -18,7 +18,7 @@ const log = childLogger("resource-server");
 
 const payToStellar = env.MERCHANT_STELLAR_ADDRESS ?? derivedKeys(env).ownerPub;
 // Merchant on Base Sepolia: an explicit address, or an app-owned Privy wallet created on first start.
-const payToEvm = env.MERCHANT_EVM_ADDRESS ?? (await ensureAppWallet("merchant")).address;
+const payToEvm = env.MERCHANT_EVM_ADDRESS ?? (isPrivyConfigured() ? (await ensureAppWallet("merchant")).address : undefined);
 
 const facilitators = [new HTTPFacilitatorClient({ url: env.X402_FACILITATOR_URL })];
 if (env.OZ_FACILITATOR_API_KEY) {
@@ -31,10 +31,11 @@ if (env.OZ_FACILITATOR_API_KEY) {
   );
 }
 
-const server = new x402ResourceServer(facilitators).register(STELLAR_CAIP2, new ExactStellarScheme()).register(BASE_SEPOLIA_CAIP2, new ExactEvmScheme());
+const server = new x402ResourceServer(facilitators).register(STELLAR_CAIP2, new ExactStellarScheme());
+if (payToEvm) server.register(BASE_SEPOLIA_CAIP2, new ExactEvmScheme());
 
 const stellarOffer = { scheme: "exact", price: "$0.01", network: STELLAR_CAIP2, payTo: payToStellar } as const;
-const evmOffer = { scheme: "exact", price: "$0.01", network: BASE_SEPOLIA_CAIP2, payTo: payToEvm } as const;
+const evmOffer = payToEvm ? ({ scheme: "exact", price: "$0.01", network: BASE_SEPOLIA_CAIP2, payTo: payToEvm } as const) : undefined;
 
 const routes: Record<string, RouteConfig> = {
   "GET /api/stellar/weather": {
@@ -42,13 +43,17 @@ const routes: Record<string, RouteConfig> = {
     description: "Live Istanbul weather (Open-Meteo), paid natively on Stellar",
     mimeType: "application/json",
   },
-  "GET /api/base/summary": {
-    accepts: [evmOffer],
-    description: "Market summary, paid on Base Sepolia (USDC bridged from Stellar via CCTP)",
-    mimeType: "application/json",
-  },
+  ...(evmOffer
+    ? {
+        "GET /api/base/summary": {
+          accepts: [evmOffer],
+          description: "Market summary, paid on Base Sepolia (USDC bridged from Stellar via CCTP)",
+          mimeType: "application/json",
+        },
+      }
+    : {}),
   "GET /api/any/quote": {
-    accepts: [stellarOffer, evmOffer],
+    accepts: evmOffer ? [stellarOffer, evmOffer] : [stellarOffer],
     description: "Motivational quote, payable on either network",
     mimeType: "application/json",
   },

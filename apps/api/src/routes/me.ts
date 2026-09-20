@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { getBalances, getContractUsdcBalance, stellarAccountUrl, stellarContractUrl, baseAddressUrl } from "@pera/core";
-import { createSession, getEvmWallet, getPasskey, getStellarWallet, type User } from "@pera/db";
+import { createAgentToken, getEvmWallet, getPasskey, getStellarWallet, ALL_SCOPES, type User } from "@pera/db";
 import { getBaseUsdcBalance } from "@pera/evm";
 import { getPosition, isConfigured } from "@pera/yield";
-import { requireUser } from "../auth";
+import { requireOwner, requireScope, requireUser } from "../auth";
 import { loadContext } from "../context";
 
 export async function meView(user: User) {
@@ -39,17 +39,17 @@ export async function meRoutes(app: FastifyInstance): Promise<void> {
   app.get("/me", async (req) => meView(requireUser(req)));
 
   /**
-   * A second session for the same user, meant for the CLI (`pnpm agent connect <token>`): a terminal cannot do
-   * the passkey ceremony, and sharing the browser's own session would die with the browser's sign-out.
+   * Token for the CLI (`pnpm agent connect <token>`): a scoped agent token with every scope (the CLI is the
+   * user's own device), 90 days, revocable from /agent/tokens. Owner session only.
    */
   app.post("/cli/token", async (req) => {
-    const user = requireUser(req);
-    const session = await createSession(user.id);
-    return { token: session.token, expiresAt: session.expiresAt, connect: `pnpm agent connect ${session.token}` };
+    const user = requireOwner(req);
+    const { token, secret } = await createAgentToken({ userId: user.id, name: "pera-agent CLI", scopes: [...ALL_SCOPES], ttlDays: 90 });
+    return { token: secret, expiresAt: token.expiresAt, id: token.id, scopes: token.scopes, connect: `pnpm agent connect ${secret}` };
   });
 
   app.get("/balances", async (req) => {
-    const user = requireUser(req);
+    const user = requireScope(req, "read");
     const ctx = await loadContext(user.id);
     const [treasury, float, smart, position, baseUsdc] = await Promise.all([
       getBalances(ctx.treasuryPub),

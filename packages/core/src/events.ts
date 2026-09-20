@@ -19,6 +19,8 @@ export type EventType =
   | "x402.402"
   | "x402.paid"
   | "x402.rejected"
+  | "approval.requested"
+  | "approval.resolved"
   | "bridge.burned"
   | "bridge.attested"
   | "bridge.minted"

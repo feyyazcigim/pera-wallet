@@ -12,7 +12,9 @@ export interface Plan {
  * paywalled endpoints the agent knows about. Unknown tasks are rejected rather than guessed.
  */
 export function planTask(task: string, prefer: "auto" | "stellar" | "evm" = "auto"): Plan[] {
-  const rs = loadEnv().RESOURCE_SERVER_URL.replace(/\/$/, "");
+  const rsUrl = loadEnv().RESOURCE_SERVER_URL;
+  if (!rsUrl) throw new Error("RESOURCE_SERVER_URL is not set: the keyword planner only knows the demo paywalls. Use `pera-agent pay <url>` with any x402 URL.");
+  const rs = rsUrl.replace(/\/$/, "");
   const t = task.toLowerCase();
   const plans: Plan[] = [];
   if (/weather|hava|forecast|temperature|istanbul/.test(t)) plans.push({ skill: "weather", url: `${rs}/api/stellar/weather`, prefer, reason: "weather is served by the Stellar-paid endpoint" });

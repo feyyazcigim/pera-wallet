@@ -37,14 +37,26 @@ export const EnvSchema = z.object({
   API_BEARER_TOKEN: z.string().min(6).default("change-me"),
   DATABASE_URL: opt(z.string()),
   WALLET_MASTER_KEY: z.string().min(16).default("dev-master-key-change-me-please"),
-  PASSKEY_RP_ID: z.string().default("localhost"),
-  PASSKEY_ORIGINS: z.string().default("http://localhost:5173,http://localhost:3000"),
-  /** Privy server wallets (required): every user gets an EVM wallet at sign-up; gas is sponsored by Privy. */
-  PRIVY_APP_ID: z.string().min(1, "PRIVY_APP_ID is required"),
-  PRIVY_APP_SECRET: z.string().min(1, "PRIVY_APP_SECRET is required"),
+  // RP ID is a bare registrable domain (WebAuthn rejects "https://x.y"); tolerate a pasted URL.
+  PASSKEY_RP_ID: z
+    .string()
+    .default("localhost")
+    .transform((v) => v.trim().replace(/^https?:\/\//, "").split("/")[0]!.split(":")[0]!.toLowerCase()),
+  PASSKEY_ORIGINS: z
+    .string()
+    .default("http://localhost:5173,http://localhost:3000")
+    .transform((v) => v.split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean).join(",")),
+  /**
+   * Privy server wallets: the only EVM path — every sign-up creates a Privy user + wallet and gas is sponsored by Privy.
+   * Left optional at the schema level only so the API can boot (status, Stellar, MCP) before the keys are configured;
+   * sign-up and every EVM action fail with a clear PRIVY_NOT_CONFIGURED error until then.
+   */
+  PRIVY_APP_ID: opt(z.string().min(1)),
+  PRIVY_APP_SECRET: opt(z.string().min(1)),
   PRIVY_GAS_SPONSORSHIP: z.enum(["on", "off"]).default("on"),
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
-  RESOURCE_SERVER_URL: z.string().url().default("http://localhost:4000"),
+  /** Demo paywall server; optional in production (agents pay third-party x402 endpoints). */
+  RESOURCE_SERVER_URL: opt(z.string().url()),
   EVENTS_FILE: z.string().default("./data/events.jsonl"),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.string().default("info"),

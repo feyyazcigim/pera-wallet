@@ -1,0 +1,16 @@
+# Candidate entry for hermes-agent/optional-mcps (verify against the upstream manifest schema before opening a PR).
+manifest_version: 1
+name: pera-wallet
+description: Pay x402 (HTTP 402) paywalls on Stellar and Base from the user's Pera Agent Wallet, within an on-chain daily cap and owner rules.
+source: https://github.com/feyyazcigim/pera-wallet/tree/main/integrations/hermes
+transport:
+  type: http
+  url: https://<api-host>/mcp
+auth:
+  type: header
+  header: Authorization
+  value: "Bearer ${env:PERA_AGENT_TOKEN}"
+  env: PERA_AGENT_TOKEN
+suggest:
+  keywords: [pera, x402, paywall, stellar, usdc, wallet, pay]
+  hosts: []

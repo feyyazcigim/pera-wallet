@@ -115,6 +115,7 @@ function topUpFloat(amount: number) {
   emit("float.topup", amount, { rule: 1 });
 }
 
+const demoKeys: import("./api").AgentKey[] = [];
 export const demoBackend: Backend = {
   async register({ displayName }) {
     await wait(4200); // stands in for the ~30 s on-chain provisioning
@@ -225,6 +226,19 @@ export const demoBackend: Backend = {
   },
   async cliToken() {
     return "ps_demo-token-not-real";
+  },
+  async agentKeys() {
+    return demoKeys;
+  },
+  async createAgentKey({ name, scopes }) {
+    await wait(500);
+    const key = { id: `tok_demo${demoKeys.length + 1}`, name, scopes, createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 90 * 86_400_000).toISOString(), lastUsedAt: null, revokedAt: null };
+    demoKeys.unshift(key);
+    return { key, secret: "pat_demo-key-not-real" };
+  },
+  async revokeAgentKey(id) {
+    const k = demoKeys.find((x) => x.id === id);
+    if (k) k.revokedAt = new Date().toISOString();
   },
   async setCap(capUsdc, _me, rules, window = "daily") {
     await wait(1400); // stands in for the passkey prompt + sponsored submit

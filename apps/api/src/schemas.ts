@@ -49,6 +49,26 @@ export const RulesBody = z.object({
   weeklyCapUsdc: DecimalUsdc.nullable(),
   maxPerCallUsdc: DecimalUsdc.nullable(),
   allowedNetworks: z.array(z.enum(["stellar:testnet", "eip155:84532"])).min(1, "allow at least one chain"),
+  /** Single payments above this amount need a human approval in the dashboard; omit/null = never. */
+  approveAboveUsdc: DecimalUsdc.nullable().optional(),
+});
+export const AgentScopeEnum = z.enum(["read", "pay", "fund", "admin"]);
+export const CreateTokenBody = z.object({
+  name: z.string().min(1).max(64),
+  scopes: z.array(AgentScopeEnum).min(1).default(["read", "pay"]),
+  ttlDays: z.number().int().positive().max(365).nullable().optional(),
+});
+export const HttpMethod = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+export const QuoteBody = z.object({
+  url: z.string().url(),
+  method: HttpMethod.default("GET"),
+  headers: z.record(z.string(), z.string()).optional(),
+  body: z.string().optional(),
+  prefer: z.enum(["auto", "stellar", "evm"]).default("auto"),
+});
+export const PayBodyV2 = QuoteBody.extend({
+  maxAmountUsdc: DecimalUsdc.optional(),
+  approvalId: z.string().optional(),
 });
 export const RulesApprovalBody = z.object({ challenge: z.string().min(16), assertion: LoginVerifyBody.shape.assertion });
 export const EvmTransferBody = z.object({ to: z.string().regex(/^0x[0-9a-fA-F]{40}$/), amountUsdc: DecimalUsdc });
@@ -66,4 +86,4 @@ export const EventSchema = z.object({
 });
 export const ErrorSchema = z.object({ error: z.string(), code: z.string().optional(), errorCode: z.number().optional(), detail: z.unknown().optional() });
 
-export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, CapBody, RulesBody, RulesApprovalBody, PayBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };
+export const bodySchemas = { RegisterOptionsBody, RegisterBody, LoginOptionsBody, LoginVerifyBody, XdrBody, AuthorizeBuildBody, OnrampBody, BankTransferBody, OfframpBody, AmountBody, PolicyBody, CapBody, RulesBody, RulesApprovalBody, PayBody, PayBodyV2, QuoteBody, CreateTokenBody, EvmTransferBody, Event: EventSchema, Error: ErrorSchema };

@@ -155,6 +155,8 @@ apps/api                 Fastify REST API: passkey auth, provisioning, per-user 
 apps/web                 reference browser client (Vite + smart-account-kit): register / login / approve agent / pay
 apps/dashboard           the product frontend (Vite + React): landing page, passkey onboarding, dashboard (home / rules / analytics)
 apps/agent               CLI = the user's agent + a software-passkey device for headless end-to-end tests
+apps/mcp-shim            @pera/mcp — stdio shim forwarding to the remote MCP server
+integrations/hermes      Hermes Agent kit: config snippet, SKILL.md, catalog manifest, README
 apps/resource-server     three x402 paywalls (stellar, base, both)
 scripts/                 keys, bootstrap (global infra + legacy single-user demo), smoke tests, demo, gen-openapi
 ```
@@ -202,7 +204,12 @@ Full schema in [openapi.yaml](openapi.yaml).
 | POST | `/onramp` `{amountTry}` · GET `/onramp/:id` | SEP‑6 deposit into the treasury + simulated wire |
 | POST | `/offramp` `{amountUsdc}` | vault → treasury if needed, SEP‑6 withdraw (sponsor pays) |
 | POST | `/yield/deposit` · `/yield/withdraw` · GET `/yield/position` | vault ops on the user's position |
-| POST | `/agent/pay` `{url, prefer?}` | runs the router for the user; body + tx hashes + timeline |
+| POST | `/agent/pay` `{url, method?, headers?, body?, prefer?, maxAmountUsdc?, approvalId?}` | pays a paywalled URL for the user (scope `pay`); body + receipt + timeline |
+| POST | `/agent/quote` · GET `/agent/services` | probe without paying · discover paid endpoints (scope `read`) |
+| POST · GET · DELETE | `/agent/tokens[/:id]` | scoped agent tokens for AI runtimes (owner) |
+| GET · POST | `/approvals[/:id/approve\|deny]` | human approvals for payments above the threshold (owner) |
+| POST | `/agent/connect/hermes` | token + config snippet + deep link for Hermes (owner) |
+| POST | `/mcp` | MCP server (Streamable HTTP) — the same capabilities as tools |
 | POST | `/agent/pay/over-cap-demo` | funds the smart account, attempts an over-cap top-up, returns the rejection |
 | POST | `/evm/transfer` `{to, amountUsdc}` | gasless USDC transfer from the user's EVM wallet |
 | GET | `/events` · `/events/stream` · `/admin/events` | per-user events / SSE · all users (admin) |
@@ -210,6 +217,30 @@ Full schema in [openapi.yaml](openapi.yaml).
 Event types: `user.registered`, `wallet.provisioned`, `agent.authorized`, `onramp.started|completed`,
 `yield.deposited|withdrawn`, `float.topup|topup.rejected`, `x402.402|paid`, `bridge.burned|attested|minted`,
 `offramp.completed` — persisted per user in Postgres.
+
+## Use Pera from Hermes / any AI agent (MCP)
+
+Pera is a **remote MCP server** at `https://<api-host>/mcp` (Streamable HTTP, stateless, bearer = a scoped **agent
+token**). No fork of the agent framework is needed; the policy stays on Pera's side, so the agent runtime is untrusted.
+
+| Tool | Scope | What it does |
+|---|---|---|
+| `wallet_info`, `get_balances`, `get_spending_policy`, `list_services`, `list_payments` | `read` | wallet, balances, on-chain cap + owner rules, paid endpoints, history |
+| `quote_payment { url }` | `read` | probe a paywall **without paying**: price, network, payee, verdict `allow \| requires_approval \| denied` |
+| `pay_url { url, max_amount_usdc?, approval_id? }` | `pay` | pay the 402 within the owner's rules, the optional approval threshold and the **on-chain daily cap**; returns the paid body + receipt (`txHash`, `explorerUrl`) |
+| `request_funding` | `fund` | IBAN + reference for the human to top up (the agent cannot fund the wallet) |
+
+Human-in-the-loop: with `approveAboveUsdc` set in the rules, larger payments return `status: requires_approval`
+with an `approveUrl`; the owner approves in the dashboard (`POST /approvals/:id/approve`) and the agent retries with
+`approval_id` (single use, 24 h). Agent tokens are minted by the owner (`POST /agent/tokens`, scopes `read | pay |
+fund | admin`), shown once, stored hashed, revocable (`DELETE /agent/tokens/:id`). Agent tokens can never change
+rules or the cap, off-ramp, or move funds out.
+
+**Hermes Agent** (`integrations/hermes/`): `POST /agent/connect/hermes` returns the `~/.hermes/config.yaml` snippet,
+the `PERA_AGENT_TOKEN` env line and a `hermes://mcp/install?…` deep link; a SKILL.md teaches the model when and how
+to pay (`quote_payment` → `pay_url` → cite the receipt). **Claude Code**: `claude mcp add --transport http pera
+https://<api-host>/mcp --header "Authorization: Bearer pat_…"`. **stdio-only clients**: `npx -y @pera/mcp`
+(`apps/mcp-shim`, forwards to the remote server, keeps no keys). Verified end to end by `pnpm smoke:mcp`.
 
 ## Design decisions and trade-offs
 
