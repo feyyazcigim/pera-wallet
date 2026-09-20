@@ -4,9 +4,8 @@ export function hermesConnectKit(apiUrl: string, token: string) {
   const config = {
     url: mcpUrl,
     headers: { Authorization: "Bearer ${PERA_AGENT_TOKEN}" },
-    trust: "untrusted",
     timeout: 120,
-    keepalive_interval: 60,
+    connect_timeout: 30,
     tools: { include: ["wallet_info", "get_balances", "get_spending_policy", "list_services", "quote_payment", "pay_url", "list_payments", "request_funding"], resources: false, prompts: false },
   };
   const snippetYaml = [
@@ -16,9 +15,8 @@ export function hermesConnectKit(apiUrl: string, token: string) {
     `    url: "${mcpUrl}"`,
     "    headers:",
     '      Authorization: "Bearer ${PERA_AGENT_TOKEN}"',
-    "    trust: untrusted          # payments ask for your confirmation; read tools are free",
-    "    timeout: 120",
-    "    keepalive_interval: 60",
+    "    timeout: 120              # pay_url may bridge via CCTP (> 60 s)",
+    "    connect_timeout: 30",
     "    tools:",
     "      include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]",
     "",

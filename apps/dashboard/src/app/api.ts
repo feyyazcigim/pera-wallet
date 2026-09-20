@@ -134,10 +134,8 @@ export function connectKit(secret: string) {
     `    url: "${mcpUrl}"`,
     "    headers:",
     '      Authorization: "Bearer ${PERA_AGENT_TOKEN}"',
-    "    trust: untrusted",
     "    timeout: 120",
-    "    keepalive_interval: 60",
-    "    protocol: auto",
+    "    connect_timeout: 30",
   ].join("\n");
   return { mcpUrl, envLine: `PERA_AGENT_TOKEN=${secret}`, snippetYaml, claudeCode: `claude mcp add --transport http pera ${mcpUrl} --header "Authorization: Bearer ${secret}"` };
 }

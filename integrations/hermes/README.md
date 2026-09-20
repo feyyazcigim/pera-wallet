@@ -29,7 +29,7 @@ Try it: `hermes -z "Quote the price of http://<resource-server>/api/stellar/weat
 - Never: change rules or the cap, off-ramp, move funds out of the wallet, or fund it (`request_funding` only returns the
   bank instructions for the human, and needs the `fund` scope).
 
-`trust: untrusted` in the snippet makes Hermes ask you before every non-read tool call; drop it once you trust the flow.
+Hermes asks before non-read tool calls (`pay_url`) unless you approve the tool for the session; read tools run freely.
 
 ## Run Hermes on a server (Dokploy, Telegram bot)
 
@@ -55,8 +55,8 @@ MCP URL, token), and the `payments/pera-wallet` skill is copied in.
    IAM keys need `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`.
    No domain is needed (Telegram long-polling). Deploy, then message the bot: "what's my wallet balance?".
 4. Later changes: edit the env in Dokploy (model, token, MCP URL) or the YAML block in `docker-compose.yml`, then
-   redeploy — the file in the volume is overwritten on boot. `trust: trusted` means no chat approval before `pay_url`
-   — the on-chain cap and router rules still apply; switch to `untrusted` to be asked every time. The boot log prints
+   redeploy — the file in the volume is overwritten on boot. The on-chain cap and router rules bound every `pay_url`,
+   whatever the model decides. The boot log prints
    `[pera] config.yaml written: …` so you can see what Hermes was given.
 
 ## Alternatives

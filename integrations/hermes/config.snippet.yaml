@@ -5,10 +5,8 @@ mcp_servers:
     url: "https://<api-host>/mcp"
     headers:
       Authorization: "Bearer ${PERA_AGENT_TOKEN}"
-    trust: untrusted            # ask before non-read tools (pay_url); read tools are free
-    timeout: 120                # pay_url may bridge via CCTP (> 60 s)
-    keepalive_interval: 60
-    protocol: auto              # stateless Streamable HTTP
+    timeout: 120                # tool-call timeout: pay_url may bridge via CCTP (> 60 s)
+    connect_timeout: 30
     tools:
       include: [wallet_info, get_balances, get_spending_policy, list_services, quote_payment, pay_url, list_payments, request_funding]
       resources: false
