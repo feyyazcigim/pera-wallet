@@ -65,7 +65,6 @@ export async function createPrivyWalletForUser(p: { userId: string; email?: stri
   }
 
   const w = await privy.wallets().create({
-    chain_type: "ethereum",
     external_id: externalId,
     entity: privyUserId ? { id: privyUserId, type: "user" } : undefined,
     idempotency_key: `pera-evm-${p.userId}`,
@@ -106,7 +105,6 @@ export async function signTypedDataFor(wallet: EvmWalletRef, typedData: TypedDat
     // caip2 is optional in the SDK types but Privy requires it for the ERC-1271 wrapping of a 7702-delegated wallet
     // ("caip-2 required"); always send it — the wallet only ever signs for Base Sepolia.
     caip2: BASE_SEPOLIA_CAIP2,
-    chain_type: "ethereum",
     params: {
       typed_data: {
         domain: jsonSafe(typedData.domain) as never,
