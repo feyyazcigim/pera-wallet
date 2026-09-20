@@ -145,7 +145,7 @@ export function connectKit(secret: string) {
     "    timeout: 300",
     "    connect_timeout: 30",
   ].join("\n");
-  return { mcpUrl, envLine: `PERA_AGENT_TOKEN=${secret}`, snippetYaml, claudeCode: `claude mcp add --transport http pera ${mcpUrl} --header "Authorization: Bearer ${secret}"` };
+  return { mcpUrl, envLine: `PERA_AGENT_TOKEN=${secret}`, snippetYaml, claudeCode: ["claude mcp add --transport http pera \\", `  ${mcpUrl} \\`, `  --header "Authorization: Bearer ${secret}"`].join("\n") };
 }
 
 /* ── session ──────────────────────────────────────────────────────────── */

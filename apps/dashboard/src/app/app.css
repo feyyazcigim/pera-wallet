@@ -39,6 +39,10 @@ h1 .line > span {
 .app-tabs ul {
   border: 0 !important;
 }
+/* plain page links: no yellow tracker line, no hover fill; the active page is simply the darker one */
+.app-tabs li > div {
+  display: none;
+}
 .app-tabs p {
   padding: 8px 16px;
   font-size: 15px;
@@ -1200,8 +1204,7 @@ h2.section-title:not(.section-head *) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 14px 11px 16px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+  padding: 16px 22px 0;
   font-size: 13px;
 }
 .code header b {
@@ -1213,7 +1216,16 @@ h2.section-title:not(.section-head *) {
   font-weight: 400;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: rgb(255 255 255 / 0.75);
+  color: rgb(255 255 255 / 0.6);
+}
+/* a card with several files: a hairline between them, everything on the same 22px left edge */
+.code-part + .code-part {
+  margin-top: 6px;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+.connect .term-tabs {
+  padding: 16px 22px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
 }
 .code-lang {
   padding: 1px 8px;
@@ -1241,7 +1253,7 @@ h2.section-title:not(.section-head *) {
 }
 .code pre {
   margin: 0;
-  padding: 14px 16px;
+  padding: 12px 22px 16px;
   overflow-x: auto;
   font-family: var(--mono);
   font-size: 12.5px;
@@ -1259,13 +1271,15 @@ h2.section-title:not(.section-head *) {
   user-select: none;
 }
 .code mark {
-  padding: 0 0.25em;
+  margin: 0 -3px; /* the highlight pads outwards, so the key stays on the character grid */
+  padding: 1px 3px;
   border-radius: 4px;
   background: rgb(255 212 0 / 0.18);
   color: var(--yellow);
 }
 .code figcaption {
-  padding: 0 16px 13px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
   font-size: 12px;
   color: rgb(255 255 255 / 0.5);
 }
@@ -1273,8 +1287,8 @@ h2.section-title:not(.section-head *) {
   background: var(--yellow);
   color: var(--ink);
 }
-.code.secret header {
-  border-bottom-color: rgb(0 0 0 / 0.15);
+.code.secret figcaption {
+  border-top-color: rgb(0 0 0 / 0.15);
 }
 .code.secret header b,
 .code.secret figcaption {
@@ -1417,7 +1431,6 @@ h2.section-title:not(.section-head *) {
     padding: 0 6px;
     border: 1px solid var(--line);
     border-radius: 26px;
-    overflow: hidden; /* the active tab's yellow line sits on the bar's own edge */
     background: rgb(255 255 255 / 0.72);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);

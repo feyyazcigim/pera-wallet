@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowFillButton } from "@/components/block/arrow-fill-button";
+import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { Rise } from "../ui";
 import { api, connectKit, SCOPES, type AgentKey, type AgentScope } from "./api";
 import { timeAgo } from "./store";
@@ -120,10 +121,7 @@ export function Agents() {
               </a>
             </div>
           )}
-          <CodeBlock label="shell" file="Claude Code" note="One command." prompt text={kit.claudeCode} mark={token} />
-          <CodeBlock label="env" file="~/.hermes/.env" note="Hermes reads the key from its environment." text={kit.envLine} mark={token} />
-          <CodeBlock label="yaml" file="~/.hermes/config.yaml" note="The same block works for the hosted bot." text={kit.snippetYaml} />
-          <CodeBlock label="http" file="MCP endpoint" note="Any MCP client: send the key as a Bearer token." text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />
+          <Connect kit={kit} token={token} />
         </aside>
       </Rise>
 
@@ -163,12 +161,35 @@ export function Agents() {
   );
 }
 
-/** A terminal-style code block: what it is, where it goes, the code, and a copy button. `mark` highlights the key inside it. */
-function CodeBlock({ label, file, note, text, prompt, secret, mark }: { label: string; file: string; note: string; text: string; prompt?: boolean; secret?: boolean; mark?: string }) {
+const CLIENTS = ["Claude Code", "Hermes", "Any MCP client"];
+
+/** One terminal card for every way in: pick the client, copy what it needs. */
+function Connect({ kit, token }: { kit: ReturnType<typeof connectKit>; token: string }) {
+  const [client, setClient] = useState(CLIENTS[0]);
+  return (
+    <figure className="code connect">
+      <div className="term-tabs">
+        <MagnetTabs slug="connect" options={CLIENTS} activeTab={client} onSelect={setClient} />
+      </div>
+      {client === "Claude Code" && <Code label="shell" file="run once in your terminal" text={kit.claudeCode} mark={token} prompt />}
+      {client === "Hermes" && (
+        <>
+          <Code label="env" file="~/.hermes/.env" text={kit.envLine} mark={token} />
+          <Code label="yaml" file="~/.hermes/config.yaml" text={kit.snippetYaml} />
+        </>
+      )}
+      {client === "Any MCP client" && <Code label="http" file="Streamable HTTP" text={`${kit.mcpUrl}\nAuthorization: Bearer ${token}`} mark={token} />}
+      <figcaption>{client === "Hermes" ? "The same two files work for the hosted bot." : client === "Claude Code" ? "Claude Code can then quote and pay paywalls from this wallet." : "Send the key as a Bearer token on every request."}</figcaption>
+    </figure>
+  );
+}
+
+/** One file or command inside a terminal card: what it is, the code, a copy button. `mark` highlights the key inside it. */
+function Code({ label, file, text, prompt, mark }: { label: string; file: string; text: string; prompt?: boolean; mark?: string }) {
   const [copied, setCopied] = useState(false);
   const parts = mark && text.includes(mark) ? text.split(mark) : [text];
   return (
-    <figure className={`code ${secret ? "secret" : ""}`}>
+    <section className="code-part">
       <header>
         <span className="code-lang">{label}</span>
         <b>{file}</b>
@@ -195,6 +216,15 @@ function CodeBlock({ label, file, note, text, prompt, secret, mark }: { label: s
           ))}
         </code>
       </pre>
+    </section>
+  );
+}
+
+/** The freshly minted key, shown once on its own yellow card. */
+function CodeBlock({ label, file, note, text, secret }: { label: string; file: string; note: string; text: string; secret?: boolean }) {
+  return (
+    <figure className={`code ${secret ? "secret" : ""}`}>
+      <Code label={label} file={file} text={text} />
       <figcaption>{note}</figcaption>
     </figure>
   );
