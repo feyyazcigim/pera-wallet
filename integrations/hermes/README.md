@@ -39,6 +39,7 @@ with the `payments/pera-wallet` skill).
 
 1. Telegram: create a bot with @BotFather (token), get your numeric user id from @userinfobot.
 2. Pera dashboard → *Connect an agent* → copy the `pat_…` token (read + pay).
+   AWS: Bedrock console → *Model access* → enable Anthropic Claude in your region; *API keys* → generate a long-term key.
 3. Dokploy → Create service → **Compose** → GitHub `pera-wallet`, branch `main`, Compose Path
    `./integrations/hermes/docker-compose.yml`. Environment tab:
    ```
@@ -46,9 +47,12 @@ with the `payments/pera-wallet` skill).
    TELEGRAM_ALLOWED_USERS=<your telegram user id>
    PERA_AGENT_TOKEN=pat_…
    PERA_MCP_URL=https://api.<domain>/mcp
-   OPENROUTER_API_KEY=sk-or-…          # or ANTHROPIC_API_KEY
-   HERMES_MODEL=openrouter/anthropic/claude-sonnet-4.5
+   AWS_BEARER_TOKEN_BEDROCK=…          # Bedrock console → API keys (long-term); or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+   AWS_REGION=us-east-1                # a region where you enabled model access for Anthropic models
+   HERMES_MODEL=us.anthropic.claude-sonnet-4-6   # inference profile id as shown in the Bedrock console
    ```
+   The model provider is AWS Bedrock (`model.provider: bedrock` in `config.yaml`; the Hermes image includes boto3).
+   IAM keys need `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`.
    No domain is needed (Telegram long-polling). Deploy, then message the bot: "what's my wallet balance?".
 4. Later changes: the live config is `/opt/data/config.yaml` inside the `hermes-data` volume (Dokploy → Compose →
    Terminal). Deleting it and redeploying re-seeds from this folder. `trust: trusted` means no chat approval before

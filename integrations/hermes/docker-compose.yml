@@ -1,7 +1,7 @@
 # Hermes Agent as a Telegram bot wired to Pera's MCP server — Dokploy "Compose" service.
 #   Compose Path: ./integrations/hermes/docker-compose.yml (GitHub provider, branch main)
-#   Environment tab: HERMES_MODEL, OPENROUTER_API_KEY (or ANTHROPIC_API_KEY), TELEGRAM_BOT_TOKEN,
-#                    TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram is long-polling (outbound only).
+#   Environment tab: AWS_BEARER_TOKEN_BEDROCK (or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY), AWS_REGION, HERMES_MODEL,
+#                    TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, PERA_AGENT_TOKEN. No domain/port: Telegram long-polls.
 # Hermes has no published image, so it is built from source (needs ~2 GB RAM at build time).
 services:
   hermes:
@@ -25,9 +25,13 @@ services:
     environment:
       HERMES_UID: ${HERMES_UID:-10000}
       HERMES_GID: ${HERMES_GID:-10000}
-      HERMES_MODEL: ${HERMES_MODEL:-openrouter/anthropic/claude-sonnet-4.5}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      HERMES_MODEL: ${HERMES_MODEL:-us.anthropic.claude-sonnet-4-6}
+      # AWS Bedrock (the image ships boto3): either a Bedrock API key or IAM keys; region must have model access enabled.
+      AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS}
       PERA_AGENT_TOKEN: ${PERA_AGENT_TOKEN}
