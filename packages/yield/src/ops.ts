@@ -77,7 +77,15 @@ export async function getPosition(ctx: YieldCtx, opts: { fresh?: boolean } = {})
   if (!opts.fresh && hit && Date.now() - hit.at < 30_000) return hit.value;
   const vault = vaultId();
   const sdk = getDefindex();
-  const bal = await throttled(() => sdk.getVaultBalance(vault, ctx.treasuryPub, NET));
+  // DeFindex simulates the share → asset conversion; on an empty vault (total supply 0) or for an address without
+  // shares the contract answers VaultErrors.AmountOverTotalSupply (#124) — that is simply a zero position.
+  let bal: { dfTokens?: unknown; underlyingBalance?: unknown } = { dfTokens: 0, underlyingBalance: [0] };
+  try {
+    bal = (await throttled(() => sdk.getVaultBalance(vault, ctx.treasuryPub, NET))) as typeof bal;
+  } catch (err) {
+    const msg = describeDefindexError(err);
+    if (!/AmountOverTotalSupply|errorCode[^0-9]*124/.test(msg)) throw new Error(`DeFindex balance failed: ${msg}`);
+  }
   let apy: number | null = null;
   try {
     const a = await throttled(() => sdk.getVaultAPY(vault, NET));
