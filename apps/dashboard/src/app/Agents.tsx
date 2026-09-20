@@ -81,23 +81,21 @@ export function Agents() {
                   <input value={name} onChange={(e) => setName(e.target.value)} maxLength={64} aria-label="key name" />
                 </label>
               </div>
-              <div className="row field scopes-row">
-                <div>
-                  <span>Scopes</span>
-                  <small>what the agent may call</small>
-                </div>
-                <div className="chain-toggles">
-                  {SCOPES.map((s) => {
-                    const on = scopes.includes(s.id);
-                    return (
-                      <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : ""} onClick={() => setScopes(on ? scopes.filter((x) => x !== s.id) : [...scopes, s.id])}>
-                        {s.label}
-                        <small>{s.hint}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {SCOPES.map((sc) => {
+                const on = scopes.includes(sc.id);
+                return (
+                  <div key={sc.id} className="row field scope-row">
+                    <div>
+                      <span>{sc.id === "read" ? "Read" : "Pay"}</span>
+                      <small>{sc.id === "read" ? "balances, limits, quotes and history" : "pay x402 paywalls, inside your rules"}</small>
+                    </div>
+                    <button type="button" role="switch" aria-checked={on} aria-label={`${sc.label} scope`} className={`switch scope-switch ${on ? "on" : ""}`} onClick={() => setScopes(on ? scopes.filter((x) => x !== sc.id) : [...scopes, sc.id])}>
+                      <i />
+                      {on ? "allowed" : "off"}
+                    </button>
+                  </div>
+                );
+              })}
               <div className="row save-row">
                 <ArrowFillButton as="button" type="submit" disabled={busy !== null || !name.trim() || scopes.length === 0} {...BTN}>
                   {busy === "create" ? "Creating…" : "Create key"}
