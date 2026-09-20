@@ -27,7 +27,7 @@ export function Rules() {
     [policy, rules],
   );
   const [form, setForm] = useState<Form | null>(null);
-  const [busy, setBusy] = useState<null | "save" | "prove" | "sweep">(null);
+  const [busy, setBusy] = useState<null | "save" | "prove">(null);
   useEffect(() => {
     if (saved && !form) setForm(saved);
   }, [saved, form]);
@@ -61,19 +61,6 @@ export function Rules() {
       toast(dailyChanged || weeklyChanged ? `Saved with your passkey. The new ${onchain} written to the policy contract, and the router enforces the rest from now on.` : "Saved with your passkey. The router enforces these on the agent's next payment.", "ok");
     } catch (err) {
       await refresh();
-      toast(err instanceof Error ? err.message : String(err), "err");
-    } finally {
-      setBusy(null);
-    }
-  }
-  async function enableSweep() {
-    if (!me) return;
-    setBusy("sweep");
-    try {
-      await api().enableAutoSweep(me);
-      await refresh();
-      toast("Auto-sweep is on. USDC sent to your smart account now moves to the treasury and the vault by itself; one day of agent budget stays on hand.", "ok");
-    } catch (err) {
       toast(err instanceof Error ? err.message : String(err), "err");
     } finally {
       setBusy(null);
@@ -138,21 +125,8 @@ export function Rules() {
             <Usage label="This week" sub={`${rules?.paymentsThisWeek ?? 0} payments settled`} used={rules?.spentThisWeekUsdc} cap={rules ? rules.weeklyCapUsdc : null} loading={loading} />
           )}
           <div className="prove">
-            <h3>Idle money goes to work.</h3>
-            <p>
-              {me?.autoSweep
-                ? `USDC sent to your smart account moves to the treasury and the vault automatically; ${usd(policy?.capUsdc ?? 0)} stays as the agent's daily budget.`
-                : "Your account predates auto-sweep: USDC sent to the smart account sits there until you enable it (one passkey prompt)."}
-            </p>
-            {!me?.autoSweep && (
-              <button type="button" className="term-link ink" disabled={busy !== null || !me} onClick={() => void enableSweep()}>
-                {busy === "sweep" ? "waiting for your passkey…" : "enable auto-sweep · sign with passkey →"}
-              </button>
-            )}
-          </div>
-          <div className="prove">
             <h3>Don't take our word for it.</h3>
-            <p>Ask the agent to pull more than its limit. The smart account's own policy rejects it. The error you get back is the contract's, not ours.</p>
+            <p>Ask for more than the limit and watch the contract refuse it.</p>
             <button type="button" className="term-link ink" disabled={busy !== null} onClick={() => void prove()}>
               {busy === "prove" ? "asking the chain…" : "try to overspend →"}
             </button>

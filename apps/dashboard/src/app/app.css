@@ -25,13 +25,15 @@ h1 .line > span {
   min-height: 100vh;
   background: var(--paper);
 }
+/* the pill spans exactly the content column of .dash-main (1280 − 2 × 48), edge to edge with the tiles */
 .app-nav .nav-inner {
-  max-width: 1120px;
+  width: calc(100% - 96px);
+  max-width: 1184px;
   height: 60px;
   margin-top: 10px;
-  padding: 0 22px 0 30px;
+  padding: 0 14px 0 30px;
   border-radius: 40px;
-  gap: 24px;
+  gap: 0;
 }
 .app-tabs {
   margin-left: auto;
@@ -50,24 +52,28 @@ h1 .line > span {
 .app-user {
   display: flex;
   align-items: center;
-  gap: 14px;
   font-size: 14px;
 }
-.app-user .eyebrow {
+.app-nav .eyebrow {
+  margin-left: 14px;
   padding: 4px 11px;
   font-size: 11.5px;
 }
+/* Sign out is one more page link: same type, same box, same rhythm as the tabs beside it */
 .app-user button {
-  padding: 0;
+  padding: 8px 16px;
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: 15px;
+  line-height: calc(1.25 / 0.875); /* the tabs' text-sm ratio */
+  color: inherit;
+  opacity: 0.5;
   cursor: pointer;
+  transition: opacity 0.15s;
 }
 .app-user button:hover {
-  color: var(--ink);
+  opacity: 1;
 }
 .dash-main {
   display: flex;
@@ -1413,6 +1419,7 @@ h2.section-title:not(.section-head *) {
 @media (max-width: 760px) {
   /* phone header: one quiet row on top, the four pages as a tab bar under the thumb */
   .nav.pill.app-nav .nav-inner {
+    width: 100%;
     height: 52px;
     margin: 8px 12px 0;
     padding: 0 16px 0 18px;
@@ -1426,6 +1433,9 @@ h2.section-title:not(.section-head *) {
   .app-user {
     margin-left: auto;
     gap: 12px;
+  }
+  .app-user button {
+    padding: 8px 2px;
   }
   .app-user > b,
   .app-user > strong,

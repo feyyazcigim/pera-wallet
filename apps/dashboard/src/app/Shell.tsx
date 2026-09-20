@@ -24,7 +24,7 @@ export function Shell() {
 function Frame() {
   const nav = useNavigate();
   const { pathname } = useLocation();
-  const { me, error } = useApp();
+  const { error } = useApp();
   const demo = session.isDemo();
   const active = Object.keys(NAV).find((k) => NAV[k] === pathname.replace(/\/$/, "")) ?? "Home";
 
@@ -49,16 +49,15 @@ function Frame() {
             pera
             <i className="logo-dot" />
           </a>
+          {demo && (
+            <span className="eyebrow">
+              <i /> demo data
+            </span>
+          )}
           <div className="app-tabs">
             <MagnetTabs slug="app-nav" options={Object.keys(NAV)} activeTab={active} onSelect={(k) => nav(NAV[k])} />
           </div>
           <div className="app-user">
-            {demo && (
-              <span className="eyebrow">
-                <i /> demo data
-              </span>
-            )}
-            <b>{me?.displayName ?? session.name() ?? ""}</b>
             <button type="button" onClick={() => void signOut()}>
               Sign out
             </button>
