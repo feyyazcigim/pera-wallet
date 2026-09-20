@@ -10,6 +10,7 @@ const Shell = lazy(() => import('./app/Shell.tsx').then((m) => ({ default: m.She
 const Onboard = lazy(() => import('./app/Onboard.tsx').then((m) => ({ default: m.Onboard })))
 const Home = lazy(() => import('./app/Home.tsx').then((m) => ({ default: m.Home })))
 const Rules = lazy(() => import('./app/Rules.tsx').then((m) => ({ default: m.Rules })))
+const Agents = lazy(() => import('./app/Agents.tsx').then((m) => ({ default: m.Agents })))
 const Analytics = lazy(() => import('./app/Analytics.tsx').then((m) => ({ default: m.Analytics })))
 
 createRoot(document.getElementById('root')!).render(
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/app" element={<Shell />}>
             <Route index element={<Home />} />
             <Route path="rules" element={<Rules />} />
+            <Route path="agents" element={<Agents />} />
             <Route path="analytics" element={<Analytics />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

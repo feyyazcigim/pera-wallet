@@ -103,6 +103,36 @@ export interface Backend {
   depositDetails(): Promise<DepositDetails>;
   /** A separate session for the CLI → the token to paste into `pnpm agent connect`. */
   cliToken(): Promise<string>;
+  /** Scoped, revocable keys for external agents (Hermes, Claude Code, …); the secret is only returned by createAgentKey. */
+  agentKeys(): Promise<AgentKey[]>;
+  createAgentKey(input: { name: string; scopes: AgentScope[] }): Promise<{ key: AgentKey; secret: string }>;
+  revokeAgentKey(id: string): Promise<void>;
+}
+
+/* ── agent keys ───────────────────────────────────────────────────────── */
+export type AgentScope = "read" | "pay" | "fund" | "admin";
+export const SCOPES: { id: AgentScope; label: string; hint: string }[] = [
+  { id: "read", label: "read", hint: "balances, policy, quotes, history" },
+  { id: "pay", label: "pay", hint: "pay x402 paywalls under your rules" },
+  { id: "fund", label: "fund", hint: "ask for deposit instructions" },
+  { id: "admin", label: "admin", hint: "submit passkey-signed changes" },
+];
+export type AgentKey = { id: string; name: string; scopes: AgentScope[]; createdAt: string; expiresAt: string | null; lastUsedAt: string | null; revokedAt: string | null };
+/** What an MCP client needs — mirrors apps/api/src/mcp/hermes.ts, computed here so the secret never round-trips. */
+export function connectKit(secret: string) {
+  const mcpUrl = `${API_URL}/mcp`;
+  const snippetYaml = [
+    "mcp_servers:",
+    "  pera_wallet:",
+    `    url: "${mcpUrl}"`,
+    "    headers:",
+    '      Authorization: "Bearer ${env:PERA_AGENT_TOKEN}"',
+    "    trust: untrusted",
+    "    timeout: 120",
+    "    keepalive_interval: 60",
+    "    protocol: auto",
+  ].join("\n");
+  return { mcpUrl, envLine: `PERA_AGENT_TOKEN=${secret}`, snippetYaml, claudeCode: `claude mcp add --transport http pera ${mcpUrl} --header "Authorization: Bearer ${secret}"` };
 }
 
 /* ── session ──────────────────────────────────────────────────────────── */
@@ -296,6 +326,13 @@ const httpBackend: Backend = {
   },
   depositDetails: async () => http<DepositDetails>("/onramp/instructions", { body: {} }),
   cliToken: async () => (await http<{ token: string }>("/cli/token", { body: {} })).token,
+  agentKeys: async () => http<AgentKey[]>("/agent/tokens"),
+  async createAgentKey(input) {
+    const r = await http<AgentKey & { token: string }>("/agent/tokens", { body: { name: input.name, scopes: input.scopes } });
+    const { token, ...key } = r;
+    return { key: { ...key, createdAt: key.createdAt ?? new Date().toISOString(), lastUsedAt: null, revokedAt: null }, secret: token };
+  },
+  revokeAgentKey: async (id) => void (await http(`/agent/tokens/${encodeURIComponent(id)}`, { method: "DELETE" })),
   // guide §5.7 — build → passkey signs in the browser (kit.signAdmin) → API submits it sponsored
   async setCap(capUsdc, me) {
     if (!me.smartAccountId || !me.credentialId) throw new ApiError(409, "Your wallet is still being set up — try again in a moment.");

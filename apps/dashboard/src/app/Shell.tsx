@@ -4,7 +4,7 @@ import { MagnetTabs } from "@/components/block/magnet-tabs";
 import { api, session } from "./api";
 import { AppDataProvider, useApp } from "./store";
 
-const NAV: Record<string, string> = { Home: "/app", Rules: "/app/rules", Analytics: "/app/analytics" };
+const NAV: Record<string, string> = { Home: "/app", Rules: "/app/rules", Agents: "/app/agents", Analytics: "/app/analytics" };
 
 /** Guard + layout: no wallet yet → the passkey onboarding. */
 export function Shell() {
