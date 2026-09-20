@@ -658,6 +658,20 @@ paths:
                 type: object
                 additionalProperties: true
         "503": *a1
+  /yield/autopilot:
+    post:
+      summary: Sweep idle treasury USDC (above YIELD_RESERVE_USDC) into the vault now
+        — the background autopilot does the same every minute
+      security: *a2
+      responses:
+        "200":
+          description: "{ deposited?, txHash?, treasuryUsdc, skipped? }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "503": *a1
   /yield/position:
     get:
       summary: Vault position and APY

@@ -31,6 +31,7 @@ const paths = {
   "/offramp": { post: { summary: "SEP-6 withdraw USDC → TRY (vault → treasury first if needed; sponsor pays)", security: bearer, requestBody: { required: true, content: json("OfframpBody") }, responses: { 200: obj("{ anchorTxId, stellarTxHash, status, amountTry }"), 400: err } } },
   "/yield/deposit": { post: { summary: "Manual vault deposit (treasury → vault)", security: bearer, requestBody: { required: true, content: json("AmountBody") }, responses: { 200: obj("{ amountUsdc, txHash, explorerUrl }"), 503: err } } },
   "/yield/withdraw": { post: { summary: "Manual vault withdraw", security: bearer, requestBody: { required: true, content: json("AmountBody") }, responses: { 200: obj("{ amountUsdc, txHash, explorerUrl }"), 503: err } } },
+  "/yield/autopilot": { post: { summary: "Sweep idle treasury USDC (above YIELD_RESERVE_USDC) into the vault now — the background autopilot does the same every minute", security: bearer, responses: { 200: obj("{ deposited?, txHash?, treasuryUsdc, skipped? }"), 503: err } } },
   "/yield/position": { get: { summary: "Vault position and APY", security: bearer, parameters: [{ name: "fresh", in: "query", schema: { type: "string", enum: ["1"] } }], responses: { 200: obj("{ vaultId, dfTokens, underlyingUsdc, apy }") } } },
   "/agent/policy": {
     get: { summary: "Cap, used, remaining, rule id — read from the spending_limit policy contract", security: bearer, responses: { 200: obj("PolicyView") } },

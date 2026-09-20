@@ -4,6 +4,7 @@ import { createAgentToken, getEvmWallet, getPasskey, getStellarWallet, ALL_SCOPE
 import { getBaseUsdcBalance } from "@pera/evm";
 import { getPosition, isConfigured } from "@pera/yield";
 import { requireOwner, requireScope, requireUser } from "../auth";
+import { sweepUser } from "../autopilot";
 import { loadContext } from "../context";
 
 export async function meView(user: User) {
@@ -50,6 +51,7 @@ export async function meRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/balances", async (req) => {
     const user = requireScope(req, "read");
+    void sweepUser(user.id); // idle USDC (e.g. sent straight to the treasury) goes to the vault without waiting for the next tick
     const ctx = await loadContext(user.id);
     const [treasury, float, smart, position, baseUsdc] = await Promise.all([
       getBalances(ctx.treasuryPub),

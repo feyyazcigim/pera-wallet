@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { deposit, getPosition, isConfigured, withdraw } from "@pera/yield";
+import { sweepUser } from "../autopilot";
 import { requireOwner, requireScope } from "../auth";
 import { loadContext } from "../context";
 import { AmountBody } from "../schemas";
@@ -21,6 +22,12 @@ export async function yieldRoutes(app: FastifyInstance): Promise<void> {
     const { amountUsdc } = AmountBody.parse(req.body);
     const tx = await withdraw(ctx, { amountUsdc });
     return { amountUsdc, txHash: tx.hash, explorerUrl: tx.explorerUrl, vaultId: tx.vaultId };
+  });
+  /** Run the autopilot for this user now: deposits everything above YIELD_RESERVE_USDC from the treasury. */
+  app.post("/yield/autopilot", async (req) => {
+    guard();
+    const r = await sweepUser(requireOwner(req).id, { force: true });
+    return r ?? { skipped: "debounced" };
   });
   app.get("/yield/position", async (req) => {
     guard();
