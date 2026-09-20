@@ -887,6 +887,11 @@ button:disabled {
   font-size: 48px;
   letter-spacing: -0.045em;
 }
+.onb-lead {
+  margin: -8px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
 .onb-card form,
 .onb-login {
   display: flex;

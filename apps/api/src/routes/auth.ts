@@ -18,7 +18,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       rp: { id: env.PASSKEY_RP_ID, name: "Pera Agent Wallet" },
       user: { id: Buffer.from(randomUUID()).toString("base64url"), name: displayName, displayName },
       pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-      authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+      authenticatorSelection: { residentKey: "required", userVerification: "required" }, // discoverable: sign-in works with no credential id, which the one-button entry relies on
       attestation: "none",
       timeout: 60_000,
     };

@@ -90,6 +90,11 @@ export class RuleViolationError extends ApiError {}
 
 export interface Backend {
   register(input: { displayName: string; email?: string; dailyCapUsdc?: number }): Promise<string>; // → session token
+  /**
+   * One button for everyone: a passkey that already lives on this device signs in, otherwise a wallet is created.
+   * `onCreating` fires when it turns out to be a new wallet, right before the (long) provisioning request.
+   */
+  enter(input: { displayName: string; email?: string }, onCreating: () => void): Promise<string>;
   login(): Promise<string>;
   logout(): Promise<void>;
   me(): Promise<Me>;
@@ -294,6 +299,47 @@ const httpBackend: Backend = {
     ls.set(CREDENTIAL_KEY, assertion.id);
     rememberOwner(r);
     return r.token;
+  },
+  /**
+   * Browsers never say whether a passkey exists, but "immediate mediation" comes close: `get()` fails at once,
+   * with no dialog, when this device holds no passkey for us, and shows the usual picker when it does.
+   * So: try that first; nothing there means a new wallet. Browsers without it fall back to the hint this
+   * browser keeps from its last visit.
+   */
+  async enter(input, onCreating) {
+    type Caps = { immediateGet?: boolean };
+    type PKC = typeof PublicKeyCredential & { getClientCapabilities?: () => Promise<Caps>; parseRequestOptionsFromJSON?: (o: unknown) => PublicKeyCredentialRequestOptions };
+    const pkc = typeof PublicKeyCredential === "undefined" ? undefined : (PublicKeyCredential as PKC);
+    const caps = await pkc?.getClientCapabilities?.().catch(() => null);
+    const unknownHere = (e: unknown) => e instanceof ApiError && (e.code === "UNKNOWN_CREDENTIAL" || e.code === "UNKNOWN_USER");
+    if (caps?.immediateGet && pkc?.parseRequestOptionsFromJSON) {
+      const o = await http<{ challenge: string; rpId: string }>("/auth/login/options", { body: {}, auth: false });
+      const asked = performance.now();
+      try {
+        const publicKey = pkc.parseRequestOptionsFromJSON({ challenge: o.challenge, rpId: o.rpId, allowCredentials: [], userVerification: "required", timeout: 60_000 });
+        // `uiMode: "immediate"` is the shipped spelling (Chrome); it is not in TypeScript's DOM types yet
+        const cred = (await navigator.credentials.get({ uiMode: "immediate", publicKey } as CredentialRequestOptions)) as (PublicKeyCredential & { toJSON(): { id: string } }) | null;
+        if (cred) {
+          const assertion = cred.toJSON();
+          const r = await http<WireSession>("/auth/login/verify", { body: { challenge: o.challenge, assertion }, auth: false });
+          ls.set(CREDENTIAL_KEY, assertion.id);
+          rememberOwner(r);
+          return r.token;
+        }
+      } catch (e) {
+        const dismissed = (e as Error)?.name === "NotAllowedError" && performance.now() - asked > 1200; // an instant refusal means "no passkey here"; a slow one means the person closed the picker
+        if (!unknownHere(e) && ((e as Error)?.name !== "NotAllowedError" || dismissed)) throw e;
+      }
+    } else if (session.knowsPasskey()) {
+      try {
+        return await this.login();
+      } catch (e) {
+        if (!unknownHere(e)) throw e;
+        session.forgetPasskey(); // stale hint (other server, wiped database): this is a new wallet after all
+      }
+    }
+    onCreating();
+    return this.register(input);
   },
   async logout() {
     await http("/auth/logout", { method: "POST", body: {} }).catch(() => undefined);
